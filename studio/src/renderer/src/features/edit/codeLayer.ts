@@ -62,38 +62,99 @@ function harness(): string {
 </script>`;
 }
 
+// Optional per-layer CSS, injected into <head>. Pasted ReactBits components
+// reference an external stylesheet we can't load; the importer captures it here.
+function cssTag(spec: CodeSpec): string {
+  return spec.css ? `<style>${spec.css}</style>` : "";
+}
+
+// The require() shim available to React code layers. Resolves the libraries the
+// iframe vendors as browser globals so real ReactBits components (which use ES
+// imports → Babel rewrites them to require()) run unchanged:
+//   • react / react-dom            → window.React / window.ReactDOM
+//   • gsap, gsap/*, gsap/all       → window.gsap (+ SplitText/ScrollTrigger)
+//   • @gsap/react (useGSAP)        → a minimal hook over gsap.context
+//   • motion, motion/react,        → window.MotionReact (bundled framer-motion)
+//     framer-motion
+//   • *.css / *.scss imports       → ignored (styling comes via cssTag)
+// Anything else throws a clear, listing error so the layer shows what's missing.
+const REQUIRE_SHIM = `
+function require(name){
+  if (name === "react") return React;
+  if (name === "react/jsx-runtime" || name === "react/jsx-dev-runtime"){
+    function jsx(type, props, key){
+      if (key !== undefined){ props = Object.assign({ key: key }, props); }
+      return React.createElement(type, props);
+    }
+    return { Fragment: React.Fragment, jsx: jsx, jsxs: jsx, jsxDEV: jsx };
+  }
+  if (name === "react-dom" || name === "react-dom/client") return ReactDOM;
+  if (/\\.(css|scss|sass|less)$/.test(name)) return {};
+  if (name === "gsap" || name.indexOf("gsap") === 0){
+    return { __esModule: true, default: window.gsap, gsap: window.gsap,
+      SplitText: window.SplitText, ScrollTrigger: window.ScrollTrigger };
+  }
+  if (name === "@gsap/react"){
+    function useGSAP(cb, deps){
+      var ref = React.useRef(null);
+      React.useLayoutEffect(function(){
+        var ctx = window.gsap.context(function(){ if (cb) cb({}, ctx); }, ref.current || undefined);
+        return function(){ ctx.revert(); };
+      }, deps || []);
+      return { context: undefined, contextSafe: undefined, scope: ref };
+    }
+    return { __esModule: true, useGSAP: useGSAP, default: useGSAP };
+  }
+  if (name === "motion" || name === "motion/react" || name === "framer-motion" || name === "motion/react-client"){
+    if (!window.MotionReact) throw new Error("motion (framer-motion) failed to load");
+    return window.MotionReact;
+  }
+  throw new Error("Module not available in code layer: '" + name +
+    "'. Available: react, react-dom, gsap, @gsap/react, motion/react. (CSS imports are ignored — paste CSS into the importer.)");
+}`;
+
 // Build the full srcdoc for a code layer. HTML layers get the raw markup; React
-// layers are transpiled in-iframe via Babel (react/react-dom/gsap vendored).
+// layers are transpiled in-iframe via Babel against the require() shim above.
 export function buildCodeSrcdoc(spec: CodeSpec): string {
   const base = vendorBase();
   if (spec.lang === "html") {
-    return `<!doctype html><html><head><meta charset="utf-8"><style>${BASE_STYLE}</style>
-<script src="${base}gsap.min.js"></script></head>
+    return `<!doctype html><html><head><meta charset="utf-8"><style>${BASE_STYLE}</style>${cssTag(spec)}
+<script src="${base}gsap.min.js"></script>
+<script src="${base}SplitText.min.js"></script>
+<script>try{window.gsap&&window.SplitText&&window.gsap.registerPlugin(window.SplitText)}catch(e){}</script></head>
 <body>${spec.source}${harness()}</body></html>`;
   }
 
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${BASE_STYLE}</style>
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${BASE_STYLE}</style>${cssTag(spec)}
 <script src="${base}react.production.min.js"></script>
 <script src="${base}react-dom.production.min.js"></script>
 <script src="${base}gsap.min.js"></script>
+<script src="${base}SplitText.min.js"></script>
+<script src="${base}motion-react.js"></script>
 <script src="${base}babel.min.js"></script>
+<script>try{window.gsap&&window.SplitText&&window.gsap.registerPlugin(window.SplitText)}catch(e){}</script>
 </head><body><div id="root"></div>
 <script>
 (function(){
   var userCode = ${JSON.stringify(spec.source)};
   try {
     var out = Babel.transform(userCode, {
-      presets: [["env", { modules: "commonjs" }], "react"],
-      filename: "component.jsx",
+      // typescript preset lets ReactBits' TSX (or the site's JS) paste run as-is;
+      // env -> CommonJS so the require() shim resolves imports. react runtime
+      // "classic" emits React.createElement (React is in scope) rather than the
+      // automatic runtime's jsx-runtime import. filename ".tsx" makes the
+      // typescript preset parse JSX; preset-react then transforms it.
+      // (isTSX/allExtensions options were removed in current Babel.)
+      presets: [
+        ["env", { modules: "commonjs" }],
+        ["react", { runtime: "classic" }],
+        ["typescript", { onlyRemoveTypeImports: true }],
+      ],
+      filename: "component.tsx",
     }).code;
     var module = { exports: {} };
     var exports = module.exports;
-    function require(name){
-      if (name === "react") return React;
-      if (name === "react-dom" || name === "react-dom/client") return ReactDOM;
-      if (name === "gsap" || name.indexOf("gsap/") === 0) return window.gsap;
-      throw new Error("Module not available in code layer: " + name);
-    }
+    ${REQUIRE_SHIM}
     var fn = new Function("React","ReactDOM","require","exports","module",
       out + "\\nreturn (module.exports && (module.exports.default || module.exports));");
     var Comp = fn(React, ReactDOM, require, exports, module);

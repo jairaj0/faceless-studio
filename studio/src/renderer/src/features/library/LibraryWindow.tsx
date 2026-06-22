@@ -3,8 +3,13 @@ import { useEditor } from "../../store/editor";
 import { useApp } from "../../store";
 import { buildCodeSrcdoc } from "../edit/codeLayer";
 import { COMPONENT_PRESETS, PRESET_CATEGORIES, type ComponentPreset, type PresetCategory } from "./presets";
+import { REACTBITS_PRESETS } from "./reactbitsPresets";
+import { ReactBitsImport } from "./ReactBitsImport";
 
 const LOOP_MS = 6000; // preview clock period — all cards loop together
+
+// Curated ReactBits components lead the gallery, then the built-in presets.
+const ALL_PRESETS: ComponentPreset[] = [...REACTBITS_PRESETS, ...COMPONENT_PRESETS];
 
 // The Import & Preview window: a gallery of ReactBits-style component presets.
 // Each card runs a live, looping preview in the same sandboxed-iframe runtime
@@ -16,12 +21,13 @@ export function LibraryWindow() {
 
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<PresetCategory | "All">("All");
+  const [importing, setImporting] = useState(false);
 
   const frames = useRef(new Map<string, HTMLIFrameElement>());
 
   const presets = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return COMPONENT_PRESETS.filter((p) => {
+    return ALL_PRESETS.filter((p) => {
       if (cat !== "All" && p.category !== cat) return false;
       if (!q) return true;
       return (p.label + " " + p.blurb + " " + p.category).toLowerCase().includes(q);
@@ -45,12 +51,18 @@ export function LibraryWindow() {
   }, []);
 
   function add(p: ComponentPreset): void {
-    addCodeClip({ lang: p.lang, source: p.source });
+    addCodeClip({ lang: p.lang, source: p.source, css: p.css });
+    setView("edit");
+  }
+
+  function addImported(spec: { lang: "react"; source: string; css?: string }): void {
+    addCodeClip(spec);
+    setImporting(false);
     setView("edit");
   }
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--fg)", overflow: "hidden" }}>
+    <div style={{ position: "relative", height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--fg)", overflow: "hidden" }}>
       {/* header */}
       <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
@@ -75,6 +87,15 @@ export function LibraryWindow() {
               <Chip key={c} active={cat === c} onClick={() => setCat(c)}>{c}</Chip>
             ))}
           </div>
+          <button
+            onClick={() => setImporting(true)}
+            style={{
+              marginLeft: "auto", padding: "6px 13px", borderRadius: 8, cursor: "pointer", fontSize: 12.5, fontWeight: 600,
+              border: "1px solid var(--accent)", background: "color-mix(in srgb, var(--accent) 20%, transparent)", color: "var(--fg)",
+            }}
+          >
+            ↧ Import from ReactBits
+          </button>
         </div>
       </div>
 
@@ -99,6 +120,8 @@ export function LibraryWindow() {
           </p>
         )}
       </div>
+
+      {importing && <ReactBitsImport onClose={() => setImporting(false)} onAdd={addImported} />}
     </div>
   );
 }
@@ -129,7 +152,10 @@ function PresetCard({
   register: (el: HTMLIFrameElement | null) => void;
 }) {
   const [hover, setHover] = useState(false);
-  const srcDoc = useMemo(() => buildCodeSrcdoc({ lang: preset.lang, source: preset.source }), [preset.lang, preset.source]);
+  const srcDoc = useMemo(
+    () => buildCodeSrcdoc({ lang: preset.lang, source: preset.source, css: preset.css }),
+    [preset.lang, preset.source, preset.css],
+  );
   return (
     <div
       onMouseEnter={() => setHover(true)}
@@ -170,12 +196,32 @@ function PresetCard({
         )}
       </div>
       {/* meta */}
-      <div style={{ padding: "9px 11px 11px", display: "flex", flexDirection: "column", gap: 3 }}>
+      <div style={{ padding: "9px 11px 11px", display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
           <strong style={{ fontSize: 13 }}>{preset.label}</strong>
           <span style={{ fontSize: 10, color: "var(--fg-3)" }}>{preset.category}</span>
         </div>
         <span style={{ fontSize: 11.5, color: "var(--fg-2)", lineHeight: 1.35 }}>{preset.blurb}</span>
+        {(preset.credit || preset.fidelity) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 2 }}>
+            {preset.fidelity && (
+              <span
+                title={preset.fidelity === "exact" ? "Seeks frame-accurately on export" : "Previews live; export is approximate (motion spring/rAF)"}
+                style={{
+                  fontSize: 9.5, fontWeight: 700, letterSpacing: ".03em", textTransform: "uppercase",
+                  padding: "1.5px 6px", borderRadius: 5,
+                  color: preset.fidelity === "exact" ? "#34d399" : "#fbbf24",
+                  background: preset.fidelity === "exact" ? "rgba(52,211,153,.13)" : "rgba(251,191,36,.13)",
+                }}
+              >
+                {preset.fidelity === "exact" ? "Frame-accurate" : "Preview"}
+              </span>
+            )}
+            {preset.credit && (
+              <span style={{ fontSize: 10, color: "var(--fg-3)" }}>via {preset.credit.label}</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

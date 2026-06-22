@@ -99,6 +99,9 @@ export const BG_PRESETS: { id: string; label: string; colors: [string, string, s
 export interface CodeSpec {
   lang: "html" | "react";
   source: string;
+  // Optional CSS injected into the layer's <head> — used by pasted ReactBits
+  // components whose `import "./X.css"` is ignored at runtime.
+  css?: string;
 }
 export const DEFAULT_CODE: CodeSpec = {
   lang: "html",

@@ -20,6 +20,15 @@ export interface ComponentPreset {
   lang: "html" | "react";
   blurb: string;
   source: string;
+  // Optional CSS injected into the layer's <head>. Curated/imported ReactBits
+  // components reference an external stylesheet we can't load at runtime, so we
+  // carry it here and feed it through CodeSpec.css.
+  css?: string;
+  // Optional attribution (e.g. a reactbits.dev source URL) shown on the card.
+  credit?: { label: string; url: string };
+  // Export-fidelity hint shown as a badge: "exact" (CSS/gsap — frame-accurate)
+  // or "preview" (motion spring/rAF — previews live, export is approximate).
+  fidelity?: "exact" | "preview";
 }
 
 export const COMPONENT_PRESETS: ComponentPreset[] = [

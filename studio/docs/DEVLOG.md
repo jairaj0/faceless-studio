@@ -4,6 +4,39 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — Direct ReactBits integration (import + curated + framer-motion)
+**Done:**
+- **ReactBits-compatible code-layer runtime** (`features/edit/codeLayer.ts`): a `require()` shim resolves the
+  ES imports real ReactBits components use — `react`, `react/jsx-runtime`, `react-dom(/client)`,
+  `gsap`/`gsap/*` (+ SplitText/ScrollTrigger), `@gsap/react` (a `useGSAP` shim over `gsap.context`), and
+  `motion`/`motion/react`/`framer-motion` → the vendored bundle. CSS/scss imports are ignored (styling comes
+  via the new `CodeSpec.css`). In-iframe Babel now runs `env`(commonjs) + `react` + `typescript`, so the
+  repo's **TSX source pastes run as-is**.
+- **Vendored framer-motion** (`scripts/vendor-motion.mjs`): esbuild bundles `motion/react` into an IIFE global
+  `window.MotionReact` (185K, `src/renderer/public/vendor/motion-react.js`) with React/ReactDOM/jsx-runtime
+  externalised to the iframe's existing globals. Also copied gsap **SplitText.min.js**. Both confirmed in
+  `out/renderer/vendor/`.
+- **"Import from ReactBits" panel** (`ReactBitsImport.tsx`): paste a component's JS/TSX + optional CSS, see a
+  live preview in the real runtime, "Add to timeline" → code layer (`lang:"react"`, `css`). Opened from a
+  Library header button. WebGL/three.js noted as unsupported.
+- **Curated real ReactBits presets** (`reactbitsPresets.ts`): BlurText, GlitchText, RotatingText — source
+  vendored **verbatim** as `?raw` text under `features/library/reactbits/` (keeps backticks/`${}` intact),
+  wrapped at build time (strip their `export default`, append a centred demo-props wrapper). Each carries
+  MIT **attribution** and a **fidelity badge**: GlitchText = "Frame-accurate" (pure CSS, seeks on export),
+  BlurText/RotatingText = "Preview" (framer-motion spring/rAF — previews live, export approximate).
+  `ComponentPreset` gained `css?`, `credit?`, `fidelity?`.
+- **Two latent bugs caught by a headless transpile+render harness** (vendored babel + real React + stubbed
+  motion, renderToStaticMarkup): (1) current `@babel/preset-typescript` **removed `isTSX`/`allExtensions`** —
+  switched to `.tsx` filename detection; (2) `preset-react` now defaults to the **automatic JSX runtime**
+  (emits `react/jsx-runtime`) — pinned `runtime:"classic"` + added a jsx-runtime entry to the shim. Both
+  affected *every* React code layer, not just ReactBits. All three curated sources now render OK.
+- `npm run typecheck` clean · `npm run build` green (73 modules) · boot-test (`npm run preview`) clean start.
+
+**Next:** optional — more curated ReactBits text/UI presets; auto-fetch a component by URL; poster thumbnails.
+**Blocked:** none. (WebGL/three.js components remain out of scope — non-deterministic for seek-based export.)
+
+---
+
 ## 2026-06-22 — Library window: ReactBits-style component presets (Import & Preview)
 **Done:**
 - **New "Library" window** (Import & Preview) re-added — 3 views now: Edit ⌘1 / **Library ⌘2** / Export ⌘3

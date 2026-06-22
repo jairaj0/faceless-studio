@@ -90,7 +90,7 @@ function CodeFrame({
   playhead: number;
   register: (el: HTMLIFrameElement | null) => void;
 }) {
-  const srcDoc = useMemo(() => buildCodeSrcdoc(clip.code!), [clip.code?.lang, clip.code?.source]);
+  const srcDoc = useMemo(() => buildCodeSrcdoc(clip.code!), [clip.code?.lang, clip.code?.source, clip.code?.css]);
   const x = evalTransform(clip, "x", playhead);
   const y = evalTransform(clip, "y", playhead);
   const scale = evalTransform(clip, "scale", playhead);
