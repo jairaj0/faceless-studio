@@ -4,6 +4,22 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — Multi-track Stage 3 (colour / filters)
+**Done — per-clip colour grade:**
+- **Model**: `Clip.filters?: FilterSpec` (brightness/contrast/saturate multipliers, hue°, blur as a
+  fraction of comp height → res-independent). `DEFAULT_FILTERS` + `FILTER_PRESETS` (None/Vivid/B&W/Noir/
+  Warm/Cool/Vintage/Dream). Actions `updateFilters` (live; sliders push history on pointer-down) +
+  `applyFilterPreset` (pushes).
+- **Render** (`composite.ts`): `filterString()` builds a CSS filter, set on `ctx.filter` inside the
+  saved transform in `drawSource` → grade rides along with the existing transform; preview == export.
+- **Inspector**: Colour section (preset grid + brightness/contrast/saturation/hue/blur sliders, double-
+  click a slider to reset, Reset Colour button), media clips only. typecheck + build green.
+
+**Next:** Stage 4 — transitions (cross-fade / wipe / slide between adjacent clips), then Stage 5 audio
+waveform + volume + fades.
+
+---
+
 ## 2026-06-22 — Multi-track Stage 2 (text / caption layers)
 **Done — clips can now be text, not just media:**
 - **Model**: `ClipType = "media" | "text"`, `Clip.text?: TextSpec` (content, fontSize as fraction of

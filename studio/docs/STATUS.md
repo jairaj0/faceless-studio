@@ -10,7 +10,7 @@ The first end-to-end vertical slice works: **import images/video → arrange on 
 Premiere-style N tracks: each track has free-positioned clips (gaps allowed); higher track composites on top; per-track hide 👁 / lock 🔒 / solo ◉ / remove. Playback uses a **master clock** (playhead drives time; every visible video is seeked/nudged to stay in sync → multiple simultaneous videos / PiP).
 - **Stage 1 — multi-track core** ✅ tracks model, compositing bottom→top, vertical+horizontal clip drag, add/remove track, per-track controls, master-clock playback, v2→v3 save migration.
 - **Stage 2 — Text / caption layers** ✅ `text` clip type, canvas-rendered (res-independent fontSize, multi-line, align, colour, box), Inspector text controls (content/font/size/weight/align/colour/box), +Text button + `T` key, keyframe-animatable like any clip.
-- Stage 3 — Color / filters (per-clip + presets) ❌
+- **Stage 3 — Colour / filters** ✅ per-clip `filters` (brightness/contrast/saturation/hue/blur, blur res-independent) applied via canvas `ctx.filter`; 8 presets (Vivid/B&W/Noir/Warm/Cool/Vintage/Dream); Inspector Colour section (preset grid + sliders, double-click to reset a slider). Preview == export.
 - Stage 4 — Transitions (cross-fade / wipe / slide) ❌
 - Stage 5 — Audio waveform + volume + fades (audio → track clips) ❌
 

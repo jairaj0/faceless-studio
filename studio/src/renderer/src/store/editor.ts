@@ -62,6 +62,29 @@ export const DEFAULT_TEXT: TextSpec = {
   bg: "",
 };
 
+// Per-clip colour grade. brightness/contrast/saturate are multipliers (1 =
+// normal), hue is degrees, blur is a fraction of comp height (res-independent).
+export interface FilterSpec {
+  brightness: number;
+  contrast: number;
+  saturate: number;
+  blur: number;
+  hue: number;
+}
+
+export const DEFAULT_FILTERS: FilterSpec = { brightness: 1, contrast: 1, saturate: 1, blur: 0, hue: 0 };
+
+export const FILTER_PRESETS: { id: string; label: string; f: FilterSpec }[] = [
+  { id: "none", label: "None", f: DEFAULT_FILTERS },
+  { id: "vivid", label: "Vivid", f: { brightness: 1.05, contrast: 1.15, saturate: 1.5, blur: 0, hue: 0 } },
+  { id: "bw", label: "B&W", f: { brightness: 1, contrast: 1.1, saturate: 0, blur: 0, hue: 0 } },
+  { id: "noir", label: "Noir", f: { brightness: 0.95, contrast: 1.4, saturate: 0, blur: 0, hue: 0 } },
+  { id: "warm", label: "Warm", f: { brightness: 1.05, contrast: 1, saturate: 1.2, blur: 0, hue: -12 } },
+  { id: "cool", label: "Cool", f: { brightness: 1, contrast: 1.05, saturate: 1.1, blur: 0, hue: 16 } },
+  { id: "vintage", label: "Vintage", f: { brightness: 1.1, contrast: 0.85, saturate: 0.7, blur: 0, hue: -15 } },
+  { id: "dream", label: "Dream", f: { brightness: 1.1, contrast: 0.95, saturate: 1.2, blur: 0.004, hue: 0 } },
+];
+
 // One clip living inside a track. Times are in milliseconds. Clips are
 // free-positioned on the timeline now (explicit `start`, gaps allowed). A clip
 // is either backed by `media` (mediaId) or is a `text` layer (text spec).
@@ -75,6 +98,7 @@ export interface Clip {
   fit: FitMode;
   transform: Transform;
   text?: TextSpec; // present when type === "text"
+  filters?: FilterSpec; // colour grade (media clips)
 }
 
 // A horizontal lane. Tracks composite bottom (index 0) → top (last).
@@ -184,6 +208,8 @@ interface EditorState {
   addClip: (mediaId: string, trackId?: string) => void;
   addTextClip: (trackId?: string) => void;
   updateText: (id: string, partial: Partial<TextSpec>) => void;
+  updateFilters: (id: string, partial: Partial<FilterSpec>) => void;
+  applyFilterPreset: (id: string, presetId: string) => void;
   removeClip: (id: string) => void;
   duplicateClip: (id: string) => void;
   splitClip: (id: string, atMs: number) => void;
@@ -346,6 +372,19 @@ export const useEditor = create<EditorState>((set, get) => {
         ...push(s),
         tracks: mapClip(id, (c) => ({ ...c, text: { ...DEFAULT_TEXT, ...c.text, ...partial } })),
       })),
+
+    // Live (sliders push history on pointer-down); presets below push themselves.
+    updateFilters: (id, partial) =>
+      set(() => ({
+        tracks: mapClip(id, (c) => ({ ...c, filters: { ...DEFAULT_FILTERS, ...c.filters, ...partial } })),
+      })),
+
+    applyFilterPreset: (id, presetId) =>
+      set((s) => {
+        const preset = FILTER_PRESETS.find((p) => p.id === presetId);
+        if (!preset) return {};
+        return { ...push(s), tracks: mapClip(id, (c) => ({ ...c, filters: { ...preset.f } })) };
+      }),
 
     removeClip: (id) =>
       set((s) => ({

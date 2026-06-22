@@ -2,10 +2,21 @@ import {
   useEditor,
   evalTransform,
   findClip,
+  DEFAULT_FILTERS,
+  FILTER_PRESETS,
   type FitMode,
+  type FilterSpec,
   type TransformKey,
 } from "../../store/editor";
 import { EASING_OPTIONS, type EasingName } from "./animate";
+
+const COLOR_ROWS: { key: keyof FilterSpec; label: string; min: number; max: number; step: number; mid: number }[] = [
+  { key: "brightness", label: "Brightness", min: 0, max: 2, step: 0.01, mid: 1 },
+  { key: "contrast", label: "Contrast", min: 0, max: 2, step: 0.01, mid: 1 },
+  { key: "saturate", label: "Saturation", min: 0, max: 3, step: 0.01, mid: 1 },
+  { key: "hue", label: "Hue", min: -180, max: 180, step: 1, mid: 0 },
+  { key: "blur", label: "Blur", min: 0, max: 0.05, step: 0.001, mid: 0 },
+];
 
 const FITS: FitMode[] = ["contain", "cover", "fill"];
 const FPS_OPTIONS = [24, 25, 30, 60];
@@ -53,6 +64,8 @@ export function Inspector() {
   const setKeyframeEasing = useEditor((s) => s.setKeyframeEasing);
   const selectKeyframe = useEditor((s) => s.selectKeyframe);
   const updateText = useEditor((s) => s.updateText);
+  const updateFilters = useEditor((s) => s.updateFilters);
+  const applyFilterPreset = useEditor((s) => s.applyFilterPreset);
   const pushHistory = useEditor((s) => s.pushHistory);
 
   const clip = findClip(tracks, selectedId);
@@ -305,6 +318,54 @@ export function Inspector() {
               ))}
             </div>
           </Section>
+
+          {!isText && m && (
+            <Section title="Colour / filters">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 5 }}>
+                {FILTER_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => applyFilterPreset(clip.id, p.id)}
+                    style={{ ...miniBtnStyle, width: "auto", padding: "5px 2px", fontSize: 10 }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              {COLOR_ROWS.map((r) => {
+                const f = clip.filters ?? DEFAULT_FILTERS;
+                const value = f[r.key];
+                const shown =
+                  r.key === "hue"
+                    ? `${Math.round(value)}°`
+                    : r.key === "blur"
+                      ? `${Math.round(value * 1000)}`
+                      : `${Math.round(value * 100)}%`;
+                return (
+                  <div key={r.key} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 11, color: "var(--fg-2)", flex: 1 }}>{r.label}</span>
+                      <span style={{ fontSize: 11, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}>{shown}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={r.min}
+                      max={r.max}
+                      step={r.step}
+                      value={value}
+                      onPointerDown={pushHistory}
+                      onChange={(e) => updateFilters(clip.id, { [r.key]: Number(e.target.value) })}
+                      onDoubleClick={() => updateFilters(clip.id, { [r.key]: r.mid })}
+                      style={{ width: "100%", accentColor: "var(--accent)" }}
+                    />
+                  </div>
+                );
+              })}
+              <button onClick={() => applyFilterPreset(clip.id, "none")} style={miniBtnStyle}>
+                Reset colour
+              </button>
+            </Section>
+          )}
 
           <Section title="Timing">
             <Field label="Duration (s)">

@@ -1,4 +1,4 @@
-import type { Clip, Composition, MediaItem, Track } from "../../store/editor";
+import type { Clip, Composition, FilterSpec, MediaItem, Track } from "../../store/editor";
 import { allClips, TF_DEFAULT } from "../../store/editor";
 import { evalProp } from "./animate";
 
@@ -182,11 +182,25 @@ function drawSource(
 
   ctx.save();
   ctx.globalAlpha = Math.max(0, Math.min(1, opacity));
+  ctx.filter = filterString(clip.filters, H);
   ctx.translate(W / 2 + x * W, H / 2 + y * H);
   ctx.rotate((rotation * Math.PI) / 180);
   ctx.scale(scale, scale);
   ctx.drawImage(src, -dw / 2, -dh / 2, dw, dh);
   ctx.restore();
+}
+
+// Build a CSS filter string from a clip's grade. blur is a fraction of comp
+// height so it's identical at any export resolution.
+function filterString(f: FilterSpec | undefined, H: number): string {
+  if (!f) return "none";
+  const parts: string[] = [];
+  if (f.brightness !== 1) parts.push(`brightness(${f.brightness})`);
+  if (f.contrast !== 1) parts.push(`contrast(${f.contrast})`);
+  if (f.saturate !== 1) parts.push(`saturate(${f.saturate})`);
+  if (f.hue) parts.push(`hue-rotate(${f.hue}deg)`);
+  if (f.blur) parts.push(`blur(${(f.blur * H).toFixed(2)}px)`);
+  return parts.length ? parts.join(" ") : "none";
 }
 
 // Draw a text/caption layer with the clip's resolved transform. Font size is a
