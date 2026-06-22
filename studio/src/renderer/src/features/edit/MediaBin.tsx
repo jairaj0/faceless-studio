@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useEditor } from "../../store/editor";
-import { importImages, importAudio, importDroppedFiles } from "./importActions";
+import { useEditor, type MediaItem } from "../../store/editor";
+import { importImages, importVideos, importAudio, importDroppedFiles } from "./importActions";
 
 export function MediaBin() {
   const media = useEditor((s) => s.media);
@@ -19,8 +19,8 @@ export function MediaBin() {
     const r = await importDroppedFiles(e.dataTransfer.files);
     const parts: string[] = [];
     if (r.images) parts.push(`${r.images} image${r.images === 1 ? "" : "s"}`);
+    if (r.videos) parts.push(`${r.videos} video${r.videos === 1 ? "" : "s"}`);
     if (r.audio) parts.push("audio");
-    if (r.video) parts.push(`${r.video} video skipped (not supported yet)`);
     if (r.skipped) parts.push(`${r.skipped} unsupported`);
     setNote(parts.length ? `Added ${parts.join(", ")}` : "Nothing to import");
     setTimeout(() => setNote(null), 3500);
@@ -50,6 +50,7 @@ export function MediaBin() {
 
       <div style={{ display: "flex", gap: 6, padding: "8px 10px" }}>
         <Btn onClick={importImages}>+ Image</Btn>
+        <Btn onClick={importVideos}>+ Video</Btn>
         <Btn onClick={importAudio}>+ Audio</Btn>
       </div>
 
@@ -76,13 +77,16 @@ export function MediaBin() {
             pointerEvents: "none",
           }}
         >
-          Drop images / audio here
+          Drop images / video / audio here
         </div>
       )}
 
       <div style={{ flex: 1, overflowY: "auto", padding: "0 8px 8px" }}>
         {media.length === 0 && (
-          <Empty>Drag images/audio here (or use the buttons), then double-click an image to add it to the timeline.</Empty>
+          <Empty>
+            Drag images/video/audio here (or use the buttons), then double-click a clip to add it to
+            the timeline.
+          </Empty>
         )}
         {media.map((m) => (
           <div
@@ -100,11 +104,7 @@ export function MediaBin() {
               border: "1px solid var(--border)",
             }}
           >
-            <img
-              src={m.dataUrl}
-              alt=""
-              style={{ width: 44, height: 28, objectFit: "cover", borderRadius: 3, flexShrink: 0 }}
-            />
+            <Thumb m={m} />
             <span
               style={{
                 flex: 1,
@@ -166,6 +166,33 @@ export function MediaBin() {
   );
 }
 
+function Thumb({ m }: { m: MediaItem }) {
+  const box = { width: 44, height: 28, borderRadius: 3, flexShrink: 0, objectFit: "cover" as const };
+  if (m.kind === "video") {
+    return (
+      <div style={{ position: "relative", ...box, overflow: "hidden", background: "#000" }}>
+        <video src={m.src} muted preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <span
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 11,
+            color: "#fff",
+            textShadow: "0 1px 2px #000",
+            pointerEvents: "none",
+          }}
+        >
+          ▶
+        </span>
+      </div>
+    );
+  }
+  return <img src={m.src} alt="" style={box} />;
+}
+
 function Header({ children }: { children: React.ReactNode }) {
   return (
     <div
@@ -191,7 +218,7 @@ function Btn({ children, onClick }: { children: React.ReactNode; onClick: () => 
       onClick={onClick}
       style={{
         flex: 1,
-        padding: "6px 8px",
+        padding: "6px 4px",
         fontSize: 11,
         color: "var(--fg)",
         background: "var(--bg-2)",

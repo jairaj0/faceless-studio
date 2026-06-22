@@ -4,6 +4,27 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — Day 1 (later 4): drag & drop + video support (import → preview → export)
+**Done**
+- **Drag & drop** onto Media bin (images/video/audio) — dashed-highlight drop zone + result note; global drop guard
+  so a stray drop can't navigate the window. Dropped files use blob URLs (same-origin → export canvas stays clean).
+- **Video is now a first-class media type** end-to-end:
+  - Import: `+ Video` button + File ▸ Import Video + drag&drop. Dialog video stays path-only → renderer streams it
+    as a Blob via `media:bytes` (no giant base64). Natural duration probed → new clip defaults to full length.
+  - Media bin shows video thumbs (first frame + ▶). Timeline shows video clips (🎞 label), same scrub/resize/remove.
+  - Preview: video clips play natively (muted, playhead locked to video time); paused = frame-accurate seek.
+  - Export: each frame seeks the active video then composites to canvas → ffmpeg. Mixed image+video timelines work.
+- Media model refactor: `MediaItem.src` (data URL for image/audio, blob URL for video) + `path` for ffmpeg; blob URLs
+  revoked on remove/reset/new-project. Audio still muxed; **video's own audio not muxed yet** (noted in Export UI).
+
+**Next**
+- Mux video-clip audio in export (ffmpeg adelay/amix) · clip reorder on timeline · then M2 scene engine.
+
+**Blocked**
+- None.
+
+---
+
 ## 2026-06-22 — Day 1 (later 3): MVP loop — import → timeline → preview → export
 **Done**
 - **Edit window** is now a real workspace: Media Bin + Preview Monitor + Timeline.

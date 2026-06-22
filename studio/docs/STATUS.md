@@ -18,7 +18,7 @@ The first end-to-end vertical slice works: **import images → arrange on timeli
 | M4 — Inspector | ❌ | port |
 | M5 — Project I/O | 🔨 | save/open .json works · timeline not serialized into doc yet |
 | M6 — Export (native ffmpeg) | ✅ | canvas frames → ffmpeg H.264 mp4, 720p–8K + audio mux |
-| M7 — Media + Audio | 🔨 | image+audio import ✅ · audio is export-only (Web Audio preview = later) |
+| M7 — Media + Audio | 🔨 | image/**video**/audio import (buttons + drag&drop) ✅ · video plays in preview + renders in export ✅ · video's own audio + Web Audio preview = later |
 | M8 — Backgrounds + Code layers | ❌ | port |
 | M9 — Polish + Package | ❌ | |
 
@@ -28,7 +28,7 @@ Currently the menu bar has **File** only (New/Open/Import Image/Import Audio/Sav
 
 ## Commands implemented so far
 ✅ File: `file.new`, `file.open`, `file.save`, `file.saveAs` (project saved as .json)
-✅ Media: `media.importImage` (⌘I), `media.importAudio`
+✅ Media: `media.importImage` (⌘I), `media.importVideo`, `media.importAudio` (+ drag & drop onto Media bin)
 ✅ Window: `window.edit` (⌘1), `window.export` (⌘2)
 
 ## Windows (2 views)

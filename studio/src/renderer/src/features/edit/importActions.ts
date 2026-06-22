@@ -1,76 +1,101 @@
-import { useEditor } from "../../store/editor";
-import type { ImportedMedia, MediaKind } from "../../../../shared/media";
+import { useEditor, type NewMedia } from "../../store/editor";
+import { probeDuration } from "./composite";
+import type { MediaKind } from "../../../../shared/media";
 
-// Shared by the Media Bin buttons and the File-menu commands so there's one
-// import path. Images can be multi-selected; audio is a single track.
+const IMAGE_EXT = ["png", "jpg", "jpeg", "webp", "gif", "svg"];
+const AUDIO_EXT = ["mp3", "wav", "m4a", "aac", "ogg"];
+const VIDEO_EXT = ["mp4", "mov", "webm", "mkv", "avi", "m4v"];
+
+// After a video is in the bin, fill its natural duration so a new clip defaults
+// to the full length.
+function fillVideoDuration(id: string, src: string): void {
+  void probeDuration(src).then((ms) => {
+    if (ms) useEditor.getState().setMediaDuration(id, ms);
+  });
+}
+
+// ---- Dialog-based import (buttons + File menu) -----------------------------
+
 export async function importImages(): Promise<void> {
   const items = await window.api.media.import("image");
-  if (items?.length) useEditor.getState().addMedia(items);
+  if (!items?.length) return;
+  useEditor.getState().addMedia(
+    items.map((m) => ({ kind: m.kind, name: m.name, path: m.path, src: m.dataUrl ?? "" })),
+  );
 }
 
 export async function importAudio(): Promise<void> {
   const items = await window.api.media.import("audio");
-  if (items?.[0]) useEditor.getState().setAudio(items[0]);
+  const m = items?.[0];
+  if (!m) return;
+  useEditor.getState().setAudio({ kind: m.kind, name: m.name, path: m.path, src: m.dataUrl ?? "" });
 }
 
-const IMAGE_EXT = ["png", "jpg", "jpeg", "webp", "gif", "svg"];
-const AUDIO_EXT = ["mp3", "wav", "m4a", "aac", "ogg"];
+export async function importVideos(): Promise<void> {
+  const items = await window.api.media.import("video");
+  if (!items?.length) return;
+  for (const m of items) {
+    const bytes = await window.api.media.bytes(m.path);
+    const src = URL.createObjectURL(new Blob([bytes as BlobPart]));
+    const [added] = useEditor.getState().addMedia([
+      { kind: "video", name: m.name, path: m.path, src, isBlob: true },
+    ]);
+    fillVideoDuration(added.id, src);
+  }
+}
 
-function kindOf(file: File): MediaKind | "video" | null {
+// ---- Drag & drop ----------------------------------------------------------
+
+function kindOf(file: File): MediaKind | null {
   if (file.type.startsWith("image/")) return "image";
   if (file.type.startsWith("audio/")) return "audio";
   if (file.type.startsWith("video/")) return "video";
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
   if (IMAGE_EXT.includes(ext)) return "image";
   if (AUDIO_EXT.includes(ext)) return "audio";
-  if (["mp4", "mov", "webm", "mkv", "avi"].includes(ext)) return "video";
+  if (VIDEO_EXT.includes(ext)) return "video";
   return null;
-}
-
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result as string);
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(file);
-  });
 }
 
 export interface DropResult {
   images: number;
   audio: number;
-  video: number; // not supported yet — counted so the UI can tell the user
+  videos: number;
   skipped: number;
 }
 
-/** Handle files dropped onto the Media Bin. Images + audio only for now. */
+/** Handle files dropped onto the Media Bin (blob URLs — clean for canvas). */
 export async function importDroppedFiles(files: FileList | File[]): Promise<DropResult> {
-  const res: DropResult = { images: 0, audio: 0, video: 0, skipped: 0 };
-  const images: ImportedMedia[] = [];
-  let audio: ImportedMedia | null = null;
+  const res: DropResult = { images: 0, audio: 0, videos: 0, skipped: 0 };
+  const images: NewMedia[] = [];
+  let audio: NewMedia | null = null;
+  const videos: NewMedia[] = [];
 
   for (const f of Array.from(files)) {
     const kind = kindOf(f);
-    if (kind === "video") {
-      res.video++;
-      continue;
-    }
-    if (kind !== "image" && kind !== "audio") {
+    if (!kind) {
       res.skipped++;
       continue;
     }
-    // Electron exposes the absolute path on dropped File objects — needed by
-    // ffmpeg on export. The data URL drives the in-app preview.
+    // Electron exposes the absolute path on dropped File objects (needed by
+    // ffmpeg). The blob URL drives in-app preview and stays same-origin so the
+    // export canvas isn't tainted.
     const path = (f as unknown as { path?: string }).path ?? "";
-    const media: ImportedMedia = { kind, name: f.name, path, dataUrl: await readAsDataUrl(f) };
-    if (kind === "image") images.push(media);
-    else audio = media;
+    const item: NewMedia = { kind, name: f.name, path, src: URL.createObjectURL(f), isBlob: true };
+    if (kind === "image") images.push(item);
+    else if (kind === "audio") audio = item;
+    else videos.push(item);
   }
 
   const st = useEditor.getState();
   if (images.length) {
     st.addMedia(images);
     res.images = images.length;
+  }
+  if (videos.length) {
+    const added = st.addMedia(videos);
+    added.forEach((m) => fillVideoDuration(m.id, m.src));
+    res.videos = videos.length;
   }
   if (audio) {
     st.setAudio(audio);

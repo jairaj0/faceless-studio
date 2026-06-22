@@ -1,16 +1,26 @@
 import { create } from "zustand";
-import type { ImportedMedia } from "../../../shared/media";
+import type { MediaKind } from "../../../shared/media";
 
-// One image clip on the single video track. Times are in milliseconds.
-export interface MediaItem extends ImportedMedia {
+// A piece of imported media. `src` is what the renderer uses (data URL for
+// image/audio, blob URL for video); `path` is the on-disk file for ffmpeg.
+export interface MediaItem {
   id: string;
+  kind: MediaKind;
+  name: string;
+  path: string;
+  src: string;
+  isBlob?: boolean; // revoke src on removal
+  duration?: number; // natural duration in ms (video/audio), filled async
 }
 
+export type NewMedia = Omit<MediaItem, "id">;
+
+// One clip on the single visual track. Times are in milliseconds.
 export interface Clip {
   id: string;
   mediaId: string;
-  start: number; // ms from timeline origin
-  duration: number; // ms
+  start: number;
+  duration: number;
 }
 
 export interface Composition {
@@ -28,31 +38,36 @@ const uid = (): string =>
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2);
 
+function revoke(m: { src: string; isBlob?: boolean } | null): void {
+  if (m?.isBlob && m.src.startsWith("blob:")) URL.revokeObjectURL(m.src);
+}
+
 interface EditorState {
   media: MediaItem[];
   clips: Clip[];
   audio: MediaItem | null;
   comp: Composition;
-  playhead: number; // ms
+  playhead: number;
   playing: boolean;
   selectedClipId: string | null;
 
-  addMedia: (items: ImportedMedia[]) => MediaItem[];
+  addMedia: (items: NewMedia[]) => MediaItem[];
+  setMediaDuration: (id: string, ms: number) => void;
   removeMedia: (id: string) => void;
   addClip: (mediaId: string) => void;
   removeClip: (id: string) => void;
   selectClip: (id: string | null) => void;
   setClipDuration: (id: string, ms: number) => void;
-  setAudio: (item: ImportedMedia | null) => void;
+  setAudio: (item: NewMedia | null) => void;
   setPlayhead: (ms: number) => void;
   play: () => void;
   pause: () => void;
   togglePlay: () => void;
   reset: () => void;
-  duration: () => number; // total timeline length in ms
+  duration: () => number;
 }
 
-// Append clips back-to-back; recompute every clip's start so the track stays gapless.
+// Append clips back-to-back so the track stays gapless.
 function relayout(clips: Clip[]): Clip[] {
   let t = 0;
   return clips.map((c) => {
@@ -77,15 +92,23 @@ export const useEditor = create<EditorState>((set, get) => ({
     return added;
   },
 
+  setMediaDuration: (id, ms) =>
+    set((s) => ({ media: s.media.map((m) => (m.id === id ? { ...m, duration: ms } : m)) })),
+
   removeMedia: (id) =>
-    set((s) => ({
-      media: s.media.filter((m) => m.id !== id),
-      clips: relayout(s.clips.filter((c) => c.mediaId !== id)),
-    })),
+    set((s) => {
+      revoke(s.media.find((m) => m.id === id) ?? null);
+      return {
+        media: s.media.filter((m) => m.id !== id),
+        clips: relayout(s.clips.filter((c) => c.mediaId !== id)),
+      };
+    }),
 
   addClip: (mediaId) =>
     set((s) => {
-      const clip: Clip = { id: uid(), mediaId, start: 0, duration: DEFAULT_CLIP_MS };
+      const m = s.media.find((x) => x.id === mediaId);
+      const duration = m?.kind === "video" && m.duration ? m.duration : DEFAULT_CLIP_MS;
+      const clip: Clip = { id: uid(), mediaId, start: 0, duration };
       return { clips: relayout([...s.clips, clip]), selectedClipId: clip.id };
     }),
 
@@ -100,11 +123,17 @@ export const useEditor = create<EditorState>((set, get) => ({
   setClipDuration: (id, ms) =>
     set((s) => ({
       clips: relayout(
-        s.clips.map((c) => (c.id === id ? { ...c, duration: Math.max(MIN_CLIP_MS, Math.round(ms)) } : c)),
+        s.clips.map((c) =>
+          c.id === id ? { ...c, duration: Math.max(MIN_CLIP_MS, Math.round(ms)) } : c,
+        ),
       ),
     })),
 
-  setAudio: (item) => set({ audio: item ? { ...item, id: uid() } : null }),
+  setAudio: (item) =>
+    set((s) => {
+      revoke(s.audio);
+      return { audio: item ? { ...item, id: uid() } : null };
+    }),
 
   setPlayhead: (ms) => set({ playhead: Math.max(0, Math.min(ms, get().duration())) }),
 
@@ -117,7 +146,11 @@ export const useEditor = create<EditorState>((set, get) => ({
   togglePlay: () => (get().playing ? get().pause() : get().play()),
 
   reset: () =>
-    set({ media: [], clips: [], audio: null, playhead: 0, playing: false, selectedClipId: null }),
+    set((s) => {
+      s.media.forEach(revoke);
+      revoke(s.audio);
+      return { media: [], clips: [], audio: null, playhead: 0, playing: false, selectedClipId: null };
+    }),
 
   duration: () => get().clips.reduce((sum, c) => sum + c.duration, 0),
 }));

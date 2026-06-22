@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useEditor } from "../../store/editor";
-import { drawFrame, preloadClips } from "../edit/composite";
+import { drawFrame, prepareFrame, preloadClips, pauseVideos } from "../edit/composite";
 import { fmtTime } from "../edit/PreviewMonitor";
 import type { ExportProgress, ExportResult } from "../../../../shared/export";
 
@@ -30,6 +30,7 @@ export function ExportWindow() {
   const H = presetH;
   const total = Math.max(1, Math.round((duration / 1000) * comp.fps));
   const ready = clips.length > 0;
+  const hasVideo = clips.some((c) => media.find((m) => m.id === c.mediaId)?.kind === "video");
 
   useEffect(() => () => void window.api.export.cancel(), []);
 
@@ -52,10 +53,12 @@ export function ExportWindow() {
 
       for (let i = 0; i < total; i++) {
         const t = (i / comp.fps) * 1000;
+        await prepareFrame(media, clips, t); // seek active video to this frame
         drawFrame(ctx, frameComp, media, clips, t);
         await window.api.export.frame(i, cv.toDataURL("image/png"));
         setProg({ phase: "capture", pct: Math.round(((i + 1) / total) * 90), frame: i + 1, total });
       }
+      pauseVideos();
 
       const res = await window.api.export.encode({
         fps: comp.fps,
@@ -138,6 +141,11 @@ export function ExportWindow() {
           <div style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 6 }}>
             Output: {W}×{H} · {total} frames · MP4 (H.264)
           </div>
+          {hasVideo && (
+            <div style={{ fontSize: 10.5, color: "var(--fg-3)", marginTop: 4 }}>
+              Video clips render their visuals; their own audio isn’t muxed yet (use the Audio track).
+            </div>
+          )}
         </div>
 
         <button

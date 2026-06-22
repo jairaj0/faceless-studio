@@ -17,17 +17,20 @@ const MIME: Record<string, string> = {
   ogg: "audio/ogg",
 };
 
+const EXT: Record<MediaKind, string[]> = {
+  image: ["png", "jpg", "jpeg", "webp", "gif", "svg"],
+  audio: ["mp3", "wav", "m4a", "aac", "ogg"],
+  video: ["mp4", "mov", "webm", "mkv", "avi", "m4v"],
+};
+
 async function pickMedia(
   parent: BrowserWindow | null,
   kind: MediaKind,
 ): Promise<ImportedMedia[] | null> {
-  const filters =
-    kind === "image"
-      ? [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg"] }]
-      : [{ name: "Audio", extensions: ["mp3", "wav", "m4a", "aac", "ogg"] }];
-  // Images can be multi-selected; audio is a single track.
+  const filters = [{ name: kind[0].toUpperCase() + kind.slice(1), extensions: EXT[kind] }];
+  // Audio is a single track; images/video can be multi-selected.
   const properties =
-    kind === "image" ? (["openFile", "multiSelections"] as const) : (["openFile"] as const);
+    kind === "audio" ? (["openFile"] as const) : (["openFile", "multiSelections"] as const);
   const opts = { properties: [...properties], filters };
 
   const res = parent
@@ -37,15 +40,15 @@ async function pickMedia(
 
   const out: ImportedMedia[] = [];
   for (const p of res.filePaths) {
-    const buf = await readFile(p);
-    const ext = extname(p).slice(1).toLowerCase();
-    const mime = MIME[ext] ?? (kind === "image" ? "image/png" : "audio/mpeg");
-    out.push({
-      kind,
-      name: basename(p),
-      path: p,
-      dataUrl: `data:${mime};base64,${buf.toString("base64")}`,
-    });
+    const item: ImportedMedia = { kind, name: basename(p), path: p };
+    // Video stays path-only (renderer streams it as a Blob). Image/audio base64.
+    if (kind !== "video") {
+      const buf = await readFile(p);
+      const ext = extname(p).slice(1).toLowerCase();
+      const mime = MIME[ext] ?? (kind === "image" ? "image/png" : "audio/mpeg");
+      item.dataUrl = `data:${mime};base64,${buf.toString("base64")}`;
+    }
+    out.push(item);
   }
   return out;
 }
@@ -54,4 +57,6 @@ export function registerMediaIpc(): void {
   ipcMain.handle("media:import", (e, kind: MediaKind) =>
     pickMedia(BrowserWindow.fromWebContents(e.sender), kind),
   );
+  // Raw bytes for a path (used to build a Blob URL for video imported via dialog).
+  ipcMain.handle("media:bytes", (_e, path: string) => readFile(path));
 }

@@ -13,6 +13,7 @@ const api = {
   media: {
     import: (kind: MediaKind): Promise<ImportedMedia[] | null> =>
       ipcRenderer.invoke("media:import", kind),
+    bytes: (path: string): Promise<Uint8Array> => ipcRenderer.invoke("media:bytes", path),
   },
   export: {
     begin: (): Promise<{ dir: string }> => ipcRenderer.invoke("export:begin"),

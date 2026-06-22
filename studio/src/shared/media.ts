@@ -1,11 +1,12 @@
-// Media that can be brought into a project. Kept tiny on purpose — the renderer
-// adds an `id` and (for images) natural dimensions on top of this.
+// Media that can be brought into a project. `dataUrl` is filled by main for
+// images/audio (small enough to base64). Video is returned as path-only — the
+// renderer turns it into a Blob URL (via media:bytes) to avoid huge base64.
 
-export type MediaKind = "image" | "audio";
+export type MediaKind = "image" | "audio" | "video";
 
 export interface ImportedMedia {
   kind: MediaKind;
   name: string;
   path: string; // absolute path on disk (used by ffmpeg on export)
-  dataUrl: string; // base64 data URL (used for preview in the renderer)
+  dataUrl?: string; // base64 data URL for image/audio; absent for video
 }

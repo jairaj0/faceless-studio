@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useEditor } from "../../store/editor";
-import { drawFrame, getImage, clipAt } from "./composite";
+import { drawFrame, getImage, getVideo, clipAt, localTime, pauseVideos } from "./composite";
 
 export function fmtTime(ms: number): string {
   const s = Math.max(0, ms) / 1000;
@@ -17,30 +17,46 @@ export function PreviewMonitor() {
   const playhead = useEditor((s) => s.playhead);
   const playing = useEditor((s) => s.playing);
   const duration = useEditor((s) => s.duration());
-  const setPlayhead = useEditor((s) => s.setPlayhead);
   const togglePlay = useEditor((s) => s.togglePlay);
-  const pause = useEditor((s) => s.pause);
 
   // Draw the current frame whenever anything visible changes.
   useEffect(() => {
-    const cv = canvasRef.current;
-    if (!cv) return;
-    const ctx = cv.getContext("2d");
+    const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
     drawFrame(ctx, comp, media, clips, playhead);
 
     // If the active image hasn't decoded yet, redraw once it loads.
     const clip = clipAt(clips, playhead);
     const m = clip && media.find((x) => x.id === clip.mediaId);
-    if (m) {
-      const img = getImage(m.dataUrl);
+    if (m && m.kind === "image") {
+      const img = getImage(m.src);
       if (!img.complete || !img.naturalWidth) {
         img.onload = () => drawFrame(ctx, comp, media, clips, playhead);
       }
     }
   }, [comp, media, clips, playhead]);
 
-  // Playback clock.
+  // While paused, keep the active video parked on the exact frame under the playhead.
+  useEffect(() => {
+    if (playing) return;
+    const clip = clipAt(clips, playhead);
+    const m = clip && media.find((x) => x.id === clip.mediaId);
+    if (!clip || m?.kind !== "video") return;
+    const v = getVideo(m.src);
+    v.pause();
+    const target = localTime(clip, m, playhead);
+    if (Math.abs(v.currentTime - target) > 0.02) {
+      const ctx = canvasRef.current?.getContext("2d");
+      const on = (): void => {
+        v.removeEventListener("seeked", on);
+        if (ctx) drawFrame(ctx, comp, media, clips, playhead);
+      };
+      v.addEventListener("seeked", on);
+      v.currentTime = target;
+    }
+  }, [playing, playhead, clips, media, comp]);
+
+  // Playback clock. Video clips drive the playhead natively; images advance by dt.
   useEffect(() => {
     if (!playing) return;
     let raf = 0;
@@ -48,18 +64,41 @@ export function PreviewMonitor() {
     const step = (now: number): void => {
       const dt = now - last;
       last = now;
-      const next = useEditor.getState().playhead + dt;
-      if (next >= duration) {
-        setPlayhead(duration);
-        pause();
+      const st = useEditor.getState();
+      const ph = st.playhead;
+      const total = st.duration();
+      const clip = clipAt(st.clips, ph);
+      const m = clip && st.media.find((x) => x.id === clip.mediaId);
+
+      let next = ph + dt;
+      if (clip && m?.kind === "video") {
+        const v = getVideo(m.src);
+        pauseVideos(m.src);
+        if (v.paused) {
+          v.currentTime = localTime(clip, m, ph);
+          void v.play();
+        }
+        const within = v.currentTime * 1000;
+        next = v.ended || within >= clip.duration ? clip.start + clip.duration : clip.start + within;
+      } else {
+        pauseVideos();
+      }
+
+      if (next >= total) {
+        st.setPlayhead(total);
+        st.pause();
+        pauseVideos();
         return;
       }
-      setPlayhead(next);
+      st.setPlayhead(next);
       raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [playing, duration, setPlayhead, pause]);
+  }, [playing]);
+
+  // Pause any playing video when the monitor unmounts.
+  useEffect(() => () => pauseVideos(), []);
 
   return (
     <div

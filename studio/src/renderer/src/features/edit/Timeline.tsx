@@ -113,7 +113,8 @@ export function Timeline() {
                     height: TRACK_H,
                     borderRadius: 6,
                     overflow: "hidden",
-                    background: m ? `center/cover url(${m.dataUrl})` : "var(--bg-2)",
+                    background:
+                      m?.kind === "image" ? `center/cover url(${m.src})` : "var(--bg-2)",
                     border: `2px solid ${active ? "var(--accent)" : "var(--border)"}`,
                     cursor: "pointer",
                     boxShadow: "inset 0 0 0 100px rgba(0,0,0,0.35)",
@@ -134,6 +135,7 @@ export function Timeline() {
                       textOverflow: "ellipsis",
                     }}
                   >
+                    {m?.kind === "video" ? "🎞 " : ""}
                     {m?.name ?? "missing"} · {fmtTime(c.duration)}
                   </div>
                   <button

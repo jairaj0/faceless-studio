@@ -22,6 +22,7 @@ export const MENU_CATALOG: MenuDef[] = [
       { commandId: "file.open", label: "Open…", shortcut: "⌘O" },
       { separator: true },
       { commandId: "media.importImage", label: "Import Image…", shortcut: "⌘I" },
+      { commandId: "media.importVideo", label: "Import Video…" },
       { commandId: "media.importAudio", label: "Import Audio…" },
       { separator: true },
       { commandId: "file.save", label: "Save", shortcut: "⌘S" },
