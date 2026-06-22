@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useEditor } from "../../store/editor";
-import { importImages, importAudio } from "./importActions";
+import { importImages, importAudio, importDroppedFiles } from "./importActions";
 
 export function MediaBin() {
   const media = useEditor((s) => s.media);
@@ -8,9 +9,35 @@ export function MediaBin() {
   const removeMedia = useEditor((s) => s.removeMedia);
   const setAudio = useEditor((s) => s.setAudio);
 
+  const [dragging, setDragging] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const onDrop = async (e: React.DragEvent): Promise<void> => {
+    e.preventDefault();
+    setDragging(false);
+    if (!e.dataTransfer.files.length) return;
+    const r = await importDroppedFiles(e.dataTransfer.files);
+    const parts: string[] = [];
+    if (r.images) parts.push(`${r.images} image${r.images === 1 ? "" : "s"}`);
+    if (r.audio) parts.push("audio");
+    if (r.video) parts.push(`${r.video} video skipped (not supported yet)`);
+    if (r.skipped) parts.push(`${r.skipped} unsupported`);
+    setNote(parts.length ? `Added ${parts.join(", ")}` : "Nothing to import");
+    setTimeout(() => setNote(null), 3500);
+  };
+
   return (
     <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        if (!dragging) setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDragging(false);
+      }}
+      onDrop={onDrop}
       style={{
+        position: "relative",
         width: 248,
         flexShrink: 0,
         display: "flex",
@@ -26,9 +53,36 @@ export function MediaBin() {
         <Btn onClick={importAudio}>+ Audio</Btn>
       </div>
 
+      {note && (
+        <div style={{ padding: "0 10px 6px", fontSize: 10.5, color: "var(--fg-3)" }}>{note}</div>
+      )}
+
+      {dragging && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 6,
+            zIndex: 10,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            padding: 12,
+            fontSize: 12,
+            color: "var(--accent)",
+            background: "rgba(139,123,255,0.10)",
+            border: "2px dashed var(--accent)",
+            borderRadius: 10,
+            pointerEvents: "none",
+          }}
+        >
+          Drop images / audio here
+        </div>
+      )}
+
       <div style={{ flex: 1, overflowY: "auto", padding: "0 8px 8px" }}>
         {media.length === 0 && (
-          <Empty>Import images, then click one to add it to the timeline.</Empty>
+          <Empty>Drag images/audio here (or use the buttons), then double-click an image to add it to the timeline.</Empty>
         )}
         {media.map((m) => (
           <div
