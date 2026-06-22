@@ -1,15 +1,41 @@
 import { useMemo, useState } from "react";
 import { buildCodeSrcdoc } from "../edit/codeLayer";
 
+// Pull every fenced ```lang … ``` block out of a markdown string.
+function fencedBlocks(md: string): { lang: string; body: string }[] {
+  const re = /```([a-zA-Z0-9]*)\r?\n([\s\S]*?)```/g;
+  const out: { lang: string; body: string }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(md))) out.push({ lang: m[1].toLowerCase(), body: m[2].replace(/\s+$/, "") });
+  return out;
+}
+
+// ReactBits' "copy prompt" is a markdown blob (props table, deps, then fenced
+// source + CSS). If the pasted text looks like that, split it into the component
+// source (the code block that default-exports) and the CSS block. Returns null
+// when there are no fences — i.e. the user pasted raw source, leave it as-is.
+function parseCopyPrompt(md: string): { source: string; css: string } | null {
+  const blocks = fencedBlocks(md);
+  if (blocks.length === 0) return null;
+  const CODE = ["tsx", "jsx", "ts", "js", "javascript", "typescript", ""];
+  const code = blocks.filter((b) => CODE.includes(b.lang) || b.body.includes("export default"));
+  const src = code.find((b) => b.body.includes("export default")) ?? code[0];
+  if (!src) return null;
+  const cssBlock = blocks.find((b) => b.lang === "css" || b.lang === "scss");
+  return { source: src.body, css: cssBlock?.body ?? "" };
+}
+
 // "Import from ReactBits" — paste any ReactBits (or hand-written) component's
 // source straight from reactbits.dev and drop it on the timeline as a code layer.
 // The same sandboxed-iframe runtime that powers the gallery previews it here, so
 // what renders is what exports. JS or TSX both work (Babel strips the types);
-// `motion/react`, gsap and `@gsap/react` resolve to the vendored libs, and the
-// component's own `import "./X.css"` is ignored — paste that CSS into the CSS box.
+// `motion/react`, gsap, `@gsap/react` and `ogl` resolve to the vendored libs, and
+// the component's own `import "./X.css"` is ignored — paste that CSS into the CSS
+// box (or paste the whole "copy prompt" and it auto-splits source + CSS).
 //
-// WebGL/three.js components (OGL, @react-three/fiber, matter-js) are unsupported:
-// they can't be seeked/rasterised deterministically for export.
+// WebGL via `ogl` is supported and exports frame-accurately (the iframe
+// virtualises requestAnimationFrame so the host can seek the render loop).
+// three.js / @react-three/fiber / matter-js are still unsupported.
 export function ReactBitsImport({
   onClose,
   onAdd,
@@ -19,6 +45,20 @@ export function ReactBitsImport({
 }) {
   const [source, setSource] = useState("");
   const [css, setCss] = useState("");
+  const [note, setNote] = useState("");
+
+  // On paste into the source box: if it's a ReactBits copy-prompt, auto-split the
+  // fenced source/CSS into the two boxes instead of dumping the whole markdown.
+  function onSourcePaste(e: React.ClipboardEvent<HTMLTextAreaElement>): void {
+    const text = e.clipboardData.getData("text");
+    const parsed = parseCopyPrompt(text);
+    if (parsed) {
+      e.preventDefault();
+      setSource(parsed.source);
+      if (parsed.css) setCss(parsed.css);
+      setNote(parsed.css ? "Split copy-prompt into source + CSS." : "Extracted source from copy-prompt.");
+    }
+  }
 
   // Only build a preview srcdoc once there's source — avoids a blank-error frame.
   const srcDoc = useMemo(
@@ -48,20 +88,22 @@ export function ReactBitsImport({
         <div style={{ padding: "13px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
           <strong style={{ fontSize: 14 }}>Import from ReactBits</strong>
           <span style={{ fontSize: 11.5, color: "var(--fg-3)" }}>
-            Paste a component’s source (JS or TSX). Supports motion, gsap & CSS — not WebGL.
+            Paste a component’s source or its “copy prompt”. Supports motion, gsap, CSS & WebGL (ogl).
           </span>
+          {note && <span style={{ fontSize: 11, color: "#34d399" }}>{note}</span>}
           <button onClick={onClose} style={iconBtn}>✕</button>
         </div>
 
         {/* body: editors | preview */}
         <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", minHeight: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", borderRight: "1px solid var(--border)", minHeight: 0 }}>
-            <Label>Component source <span style={{ color: "var(--fg-3)", fontWeight: 400 }}>· must default-export a component</span></Label>
+            <Label>Component source <span style={{ color: "var(--fg-3)", fontWeight: 400 }}>· default-export a component, or paste a copy-prompt</span></Label>
             <textarea
               value={source}
               onChange={(e) => setSource(e.target.value)}
+              onPaste={onSourcePaste}
               spellCheck={false}
-              placeholder={'import GradientText from "./GradientText";\n\nexport default function App() {\n  return <GradientText>Hello</GradientText>;\n}'}
+              placeholder={'Paste a ReactBits "copy prompt" here (auto-splits),\nor a component that default-exports:\n\nexport default function App() {\n  return <GradientText>Hello</GradientText>;\n}'}
               style={{ ...editor, flex: 2 }}
             />
             <Label>CSS <span style={{ color: "var(--fg-3)", fontWeight: 400 }}>· paste the component’s .css (its import is ignored)</span></Label>

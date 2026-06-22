@@ -15,19 +15,30 @@ import glitchTextRaw from "./reactbits/GlitchText.txt?raw";
 import glitchTextCss from "./reactbits/GlitchText.css.txt?raw";
 import rotatingTextRaw from "./reactbits/RotatingText.txt?raw";
 import rotatingTextCss from "./reactbits/RotatingText.css.txt?raw";
+import strandsRaw from "./reactbits/Strands.txt?raw";
+import strandsCss from "./reactbits/Strands.css.txt?raw";
 import type { ComponentPreset } from "./presets";
 
 const RB_URL = "https://reactbits.dev/text-animations";
 
-// Strip the component's own default export, then append a centred wrapper whose
-// default export is what the code layer mounts. `render` is JSX (Babel handles it
-// in-iframe) referencing the now-in-scope component by name.
-function wrap(raw: string, name: string, render: string): string {
-  const stripped = raw.replace(new RegExp(`export\\s+default\\s+${name}\\s*;?`), "");
+// Strip the component's own default export (handles all three forms:
+// `export default Name;`, `export default function Name(`, `export default class
+// Name`), then append a wrapper whose default export is what the code layer
+// mounts. `render` is JSX (Babel handles it in-iframe) referencing the
+// now-in-scope component by name. `fill` picks a full-bleed container (for
+// backgrounds) instead of the default centred text box.
+function wrap(raw: string, name: string, render: string, fill = false): string {
+  const stripped = raw
+    .replace(new RegExp(`export\\s+default\\s+function\\s+${name}\\b`), `function ${name}`)
+    .replace(new RegExp(`export\\s+default\\s+class\\s+${name}\\b`), `class ${name}`)
+    .replace(new RegExp(`export\\s+default\\s+${name}\\s*;?`), "");
+  const style = fill
+    ? `{ position: "absolute", inset: 0, width: "100%", height: "100%" }`
+    : `{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "system-ui,-apple-system,Segoe UI,sans-serif", fontWeight: 800, fontSize: "clamp(26px,7vw,72px)", textAlign: "center", padding: "5%", boxSizing: "border-box" }`;
   return `${stripped}
 export default function __RBPreset() {
   return (
-    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "system-ui,-apple-system,Segoe UI,sans-serif", fontWeight: 800, fontSize: "clamp(26px,7vw,72px)", textAlign: "center", padding: "5%", boxSizing: "border-box" }}>
+    <div style={${style}}>
       ${render}
     </div>
   );
@@ -69,6 +80,22 @@ export const REACTBITS_PRESETS: ComponentPreset[] = [
       rotatingTextRaw,
       "RotatingText",
       `<span>Make it&nbsp;<RotatingText texts={["creative","animated","exportable"]} rotationInterval={1600} mainClassName="rb-rot" /></span>`,
+    ),
+  },
+  {
+    id: "rb-strands",
+    label: "Strands",
+    category: "Background",
+    lang: "react",
+    blurb: "Flowing WebGL light strands (ogl). Time-virtualised — seeks frame-accurately on export.",
+    credit: { label: "ReactBits", url: "https://reactbits.dev/animations/strands" },
+    fidelity: "exact",
+    css: strandsCss,
+    source: wrap(
+      strandsRaw,
+      "Strands",
+      `<Strands colors={["#FF4242", "#7C3AED", "#06B6D4", "#EAB308"]} count={3} speed={0.5} />`,
+      true,
     ),
   },
 ];

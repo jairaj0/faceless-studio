@@ -4,6 +4,33 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — WebGL / ogl support (Strands) via time-virtualisation
+**Done:**
+- **Vendored `ogl`** (`scripts/vendor-ogl.mjs`): esbuild bundles `export * from "ogl"` into an IIFE global
+  `window.ogl` (133K, `src/renderer/public/vendor/ogl.js`). Added `ogl` to the code-layer `require()` shim and
+  loaded `ogl.js` in both srcdoc branch heads.
+- **Time-virtualisation in the iframe** (`codeLayer.ts` `clockSetup()`, injected in `<head>` before user code):
+  overrides `requestAnimationFrame`/`cancelAnimationFrame` to queue callbacks and invoke them with a
+  host-controlled *virtual* timestamp. `window.__clock.seek(ms)` freezes + pumps (twice, so re-registered
+  callbacks settle) → any rAF-driven loop (WebGL/ogl Strands, canvas, motion useAnimationFrame) becomes
+  **seek-accurate on export**, exactly like CSS/gsap. `play()` advances virtual time in real-time for live
+  preview. `performance.now` is deliberately left native (overriding it starves React's scheduler — components
+  read the rAF timestamp arg instead). gsap loads *before* `clockSetup` so its ticker keeps native rAF (we
+  still drive it explicitly via globalTimeline). `getContext` is patched to force `preserveDrawingBuffer:true`
+  for webgl/webgl2/experimental-webgl so the last frame survives `modern-screenshot` rasterisation. The capture
+  paint-wait uses the stored `nativeRAF`, not the virtualised one.
+- **Strands curated preset** (`reactbitsPresets.ts`): real ReactBits Strands TSX + CSS vendored verbatim as
+  `?raw`; `wrap()` generalised to strip `export default function/class Name` (not just `export default Name;`)
+  and gained a full-bleed (`fill`) container for backgrounds. Category **Background**, fidelity **exact**.
+- **Importer copy-prompt parsing** (`ReactBitsImport.tsx`): pasting a ReactBits "copy prompt" auto-splits the
+  fenced source/CSS blocks into the two boxes (`parseCopyPrompt`); WebGL/ogl note updated.
+- Build + `tsc --noEmit` both clean; vendored libs confirmed in `out/renderer/vendor/`.
+
+**Next:** GUI smoke-test Strands preview + a short export to eyeball frame-accuracy; consider curating more ogl
+backgrounds (Aurora, Threads, etc.) now that the runtime supports them.
+
+---
+
 ## 2026-06-22 — Direct ReactBits integration (import + curated + framer-motion)
 **Done:**
 - **ReactBits-compatible code-layer runtime** (`features/edit/codeLayer.ts`): a `require()` shim resolves the
