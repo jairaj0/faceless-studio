@@ -25,12 +25,4 @@ export const MENU_CATALOG: MenuDef[] = [
       { commandId: "file.saveAs", label: "Save As…", shortcut: "⇧⌘S" },
     ],
   },
-  {
-    title: "Window",
-    items: [
-      { commandId: "window.edit", label: "Edit", shortcut: "⌘1" },
-      { commandId: "window.import", label: "Import & Preview", shortcut: "⌘2" },
-      { commandId: "window.export", label: "Export", shortcut: "⌘3" },
-    ],
-  },
 ];

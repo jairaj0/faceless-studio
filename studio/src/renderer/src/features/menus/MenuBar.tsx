@@ -15,7 +15,6 @@ export function MenuBar() {
   const view = useApp((s) => s.view);
   const setView = useApp((s) => s.setView);
 
-  // close on outside click
   useEffect(() => {
     if (!open) return;
     const h = () => setOpen(null);
@@ -28,86 +27,94 @@ export function MenuBar() {
       style={{
         display: "flex",
         alignItems: "center",
-        height: 30,
+        height: 32,
         background: "var(--bg)",
         borderBottom: "1px solid var(--border)",
         padding: "0 8px",
-        gap: 2,
         flexShrink: 0,
       }}
       onMouseDown={(e) => e.stopPropagation()}
     >
+      {/* LEFT: logo + menus */}
+      <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <div
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: 4,
+            background: "var(--accent)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontWeight: 800,
+            fontSize: 10,
+            color: "#fff",
+            marginRight: 8,
+          }}
+        >
+          FS
+        </div>
+        {MENU_CATALOG.map((menu) => (
+          <Menu
+            key={menu.title}
+            menu={menu}
+            open={open === menu.title}
+            onToggle={() => setOpen(open === menu.title ? null : menu.title)}
+            onHover={() => open && setOpen(menu.title)}
+            onClose={() => setOpen(null)}
+          />
+        ))}
+      </div>
+
+      {/* CENTER: window switcher */}
       <div
         style={{
-          width: 20,
-          height: 20,
-          borderRadius: 4,
-          background: "var(--accent)",
+          flex: 1,
           display: "flex",
-          alignItems: "center",
+          alignItems: "stretch",
           justifyContent: "center",
-          fontWeight: 800,
-          fontSize: 10,
-          color: "#fff",
-          marginRight: 8,
+          height: "100%",
+          gap: 2,
         }}
       >
-        FS
+        {WINDOWS.map((w) => {
+          const active = w.id === view;
+          return (
+            <button
+              key={w.id}
+              onClick={() => setView(w.id)}
+              style={{
+                position: "relative",
+                padding: "0 14px",
+                background: "none",
+                border: "none",
+                color: active ? "var(--fg)" : "var(--fg-3)",
+                fontSize: 12,
+                fontWeight: active ? 600 : 400,
+                cursor: "pointer",
+              }}
+            >
+              {w.label}
+              {active && (
+                <span
+                  style={{
+                    position: "absolute",
+                    left: 10,
+                    right: 10,
+                    bottom: 0,
+                    height: 2,
+                    background: "var(--accent)",
+                    borderRadius: 2,
+                  }}
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
-      {MENU_CATALOG.map((menu) => (
-        <Menu
-          key={menu.title}
-          menu={menu}
-          open={open === menu.title}
-          onToggle={() => setOpen(open === menu.title ? null : menu.title)}
-          onHover={() => open && setOpen(menu.title)}
-          onClose={() => setOpen(null)}
-        />
-      ))}
 
-      {/* divider */}
-      <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 8px" }} />
-
-      {/* window switcher — shows current window, click to switch */}
-      {WINDOWS.map((w) => {
-        const active = w.id === view;
-        return (
-          <button
-            key={w.id}
-            onClick={() => setView(w.id)}
-            style={{
-              position: "relative",
-              padding: "0 10px",
-              height: "100%",
-              background: "none",
-              border: "none",
-              color: active ? "var(--fg)" : "var(--fg-3)",
-              fontSize: 12,
-              fontWeight: active ? 600 : 400,
-              cursor: "pointer",
-            }}
-          >
-            {w.label}
-            {active && (
-              <span
-                style={{
-                  position: "absolute",
-                  left: 8,
-                  right: 8,
-                  bottom: 0,
-                  height: 2,
-                  background: "var(--accent)",
-                  borderRadius: 2,
-                }}
-              />
-            )}
-          </button>
-        );
-      })}
-
-      <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--fg-3)" }}>
-        {projectName}
-      </span>
+      {/* RIGHT: project name */}
+      <span style={{ fontSize: 11, color: "var(--fg-3)" }}>{projectName}</span>
     </div>
   );
 }
@@ -133,7 +140,7 @@ function Menu({
         style={{
           padding: "0 8px",
           height: 22,
-          background: open ? "var(--hover, #2f2f2f)" : "none",
+          background: open ? "var(--bg-2)" : "none",
           border: "none",
           color: "var(--fg-2)",
           fontSize: 12,
@@ -175,7 +182,7 @@ function Menu({
                   onClose();
                 }}
                 onMouseEnter={(e) => {
-                  if (enabled) e.currentTarget.style.background = "var(--hover, #2f2f2f)";
+                  if (enabled) e.currentTarget.style.background = "var(--bg-1)";
                 }}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
                 style={{
@@ -196,9 +203,7 @@ function Menu({
                 }}
               >
                 <span>{item.label}</span>
-                {item.shortcut && (
-                  <span style={{ color: "var(--fg-3)" }}>{item.shortcut}</span>
-                )}
+                {item.shortcut && <span style={{ color: "var(--fg-3)" }}>{item.shortcut}</span>}
               </button>
             );
           })}
