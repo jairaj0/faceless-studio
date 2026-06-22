@@ -3,14 +3,15 @@ import { MENU_CATALOG, type MenuDef } from "./menuCatalog";
 import { getCommand, isEnabled, runCommand } from "../../commands";
 import { useApp, type AppView } from "../../store";
 
-const WINDOWS: { id: AppView; label: string }[] = [
-  { id: "edit", label: "Edit" },
-  { id: "import", label: "Import & Preview" },
-  { id: "export", label: "Export" },
+const WINDOWS: { id: AppView; label: string; shortcut: string }[] = [
+  { id: "edit", label: "Edit", shortcut: "⌘1" },
+  { id: "import", label: "Import & Preview", shortcut: "⌘2" },
+  { id: "export", label: "Export", shortcut: "⌘3" },
 ];
 
 export function MenuBar() {
   const [open, setOpen] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<AppView | null>(null);
   const projectName = useApp((s) => s.projectName);
   const view = useApp((s) => s.view);
   const setView = useApp((s) => s.setView);
@@ -83,6 +84,8 @@ export function MenuBar() {
             <button
               key={w.id}
               onClick={() => setView(w.id)}
+              onMouseEnter={() => setHovered(w.id)}
+              onMouseLeave={() => setHovered((h) => (h === w.id ? null : h))}
               style={{
                 position: "relative",
                 padding: "0 14px",
@@ -107,6 +110,45 @@ export function MenuBar() {
                     borderRadius: 2,
                   }}
                 />
+              )}
+              {hovered === w.id && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 6px)",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "3px 8px",
+                    background: "var(--bg-2)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 5,
+                    boxShadow: "0 6px 18px rgba(0,0,0,0.45)",
+                    fontSize: 11,
+                    fontWeight: 400,
+                    color: "var(--fg-2)",
+                    whiteSpace: "nowrap",
+                    pointerEvents: "none",
+                    zIndex: 600,
+                  }}
+                >
+                  {w.label}
+                  <kbd
+                    style={{
+                      padding: "1px 5px",
+                      borderRadius: 3,
+                      background: "var(--bg)",
+                      border: "1px solid var(--border)",
+                      color: "var(--fg-3)",
+                      fontSize: 10,
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {w.shortcut}
+                  </kbd>
+                </span>
               )}
             </button>
           );
