@@ -1,0 +1,17 @@
+# dependencies & build output
+node_modules/
+out/
+dist/
+release/
+
+# OS / logs / local tooling
+.DS_Store
+*.log
+npm-debug.log*
+.claude/
+
+# external reference clone (not our code; has its own git)
+video-editor/_eval-openreel/
+
+# render temp frames
+**/frames_*/

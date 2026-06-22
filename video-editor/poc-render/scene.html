@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; }
+      /* Logical 1920x1080 stage. Everything below is vector/DOM/SVG/CSS,
+         so it stays razor-sharp at ANY output resolution (1080p / 4K / 8K)
+         — exactly like zooming a website: text & SVG never pixelate. */
+      #stage {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+        background: #0b0f1a;
+        overflow: hidden;
+      }
+      .blob {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(40px);
+        opacity: 0.55;
+      }
+      #b1 { width: 700px; height: 700px; background: #6d5efc; }
+      #b2 { width: 620px; height: 620px; background: #19c3a6; }
+      #b3 { width: 520px; height: 520px; background: #ff5d8f; }
+
+      #grid {
+        position: absolute; inset: 0;
+        background-image:
+          linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+        background-size: 64px 64px;
+      }
+
+      #title {
+        position: absolute;
+        left: 140px; top: 380px;
+        font-size: 150px;
+        font-weight: 800;
+        letter-spacing: -4px;
+        color: #ffffff;
+        line-height: 0.95;
+      }
+      #title .accent { color: #8b7bff; }
+      #subtitle {
+        position: absolute;
+        left: 146px; top: 600px;
+        font-size: 46px;
+        font-weight: 500;
+        color: #9fb0c9;
+      }
+
+      /* lower third */
+      #lower {
+        position: absolute;
+        left: 146px; bottom: 120px;
+        display: flex; align-items: center; gap: 22px;
+      }
+      #lower .dot {
+        width: 26px; height: 26px; border-radius: 50%;
+        background: #19c3a6;
+      }
+      #lower .txt { font-size: 34px; font-weight: 600; color: #e6edf7; }
+
+      /* progress bar */
+      #barwrap {
+        position: absolute; left: 146px; right: 146px; bottom: 80px;
+        height: 6px; background: rgba(255,255,255,0.12); border-radius: 99px;
+      }
+      #bar { height: 100%; width: 0%; background: #8b7bff; border-radius: 99px; }
+
+      /* a crisp SVG badge to prove vector sharpness */
+      #badge { position: absolute; right: 150px; top: 150px; }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <div id="grid"></div>
+      <div class="blob" id="b1" style="left: 1100px; top: -120px"></div>
+      <div class="blob" id="b2" style="left: -120px; top: 560px"></div>
+      <div class="blob" id="b3" style="left: 1300px; top: 620px"></div>
+
+      <svg id="badge" width="180" height="180" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="46" fill="none" stroke="#8b7bff" stroke-width="3" />
+        <path d="M35 52 l10 12 l22 -28" fill="none" stroke="#19c3a6"
+              stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+
+      <div id="title">Quality has<br /><span class="accent">no limit.</span></div>
+      <div id="subtitle">720p PC · rendered at 8K · zero pixelation</div>
+
+      <div id="lower">
+        <div class="dot"></div>
+        <div class="txt">Faceless Studio — web animation → video</div>
+      </div>
+      <div id="barwrap"><div id="bar"></div></div>
+    </div>
+
+    <script>
+      // Deterministic animation: a pure function of time (ms).
+      // No requestAnimationFrame — every frame is reproducible at any fps.
+      window.DURATION = 4000; // ms
+
+      const clamp = (x, a, b) => Math.min(Math.max(x, a), b);
+      const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+      const lerp = (a, b, t) => a + (b - a) * t;
+
+      const title = document.getElementById("title");
+      const subtitle = document.getElementById("subtitle");
+      const lower = document.getElementById("lower");
+      const bar = document.getElementById("bar");
+      const badge = document.getElementById("badge");
+      const b1 = document.getElementById("b1");
+      const b2 = document.getElementById("b2");
+      const b3 = document.getElementById("b3");
+
+      window.seek = function (tMs) {
+        const t = clamp(tMs, 0, window.DURATION);
+        const p = t / window.DURATION; // 0..1 overall
+
+        // floating blobs (continuous motion)
+        const a = (t / 1000);
+        b1.style.transform = `translate(${Math.sin(a * 0.8) * 60}px, ${Math.cos(a * 0.6) * 50}px)`;
+        b2.style.transform = `translate(${Math.cos(a * 0.7) * 70}px, ${Math.sin(a * 0.5) * 60}px)`;
+        b3.style.transform = `translate(${Math.sin(a * 0.5) * 50}px, ${Math.cos(a * 0.9) * 70}px)`;
+
+        // title: slide up + fade (0 -> 1.2s)
+        const tp = easeOut(clamp(t / 1200, 0, 1));
+        title.style.opacity = tp;
+        title.style.transform = `translateY(${lerp(60, 0, tp)}px)`;
+
+        // subtitle: 0.5s -> 1.7s
+        const sp = easeOut(clamp((t - 500) / 1200, 0, 1));
+        subtitle.style.opacity = sp;
+        subtitle.style.transform = `translateY(${lerp(40, 0, sp)}px)`;
+
+        // lower third: 1.2s -> 2.2s
+        const lp = easeOut(clamp((t - 1200) / 1000, 0, 1));
+        lower.style.opacity = lp;
+        lower.style.transform = `translateX(${lerp(-40, 0, lp)}px)`;
+
+        // badge pop: 1.6s -> 2.2s
+        const bp = easeOut(clamp((t - 1600) / 600, 0, 1));
+        badge.style.opacity = bp;
+        badge.style.transform = `scale(${lerp(0.4, 1, bp)}) rotate(${lerp(-30, 0, bp)}deg)`;
+
+        // progress bar tracks whole timeline
+        bar.style.width = `${p * 100}%`;
+      };
+
+      window.seek(0);
+      window.__ready = true;
+    </script>
+  </body>
+</html>
