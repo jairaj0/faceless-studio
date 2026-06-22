@@ -4,6 +4,29 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — Multi-track Stage 5 (audio waveform + volume + fades) — plan COMPLETE
+**Done — final OpenReel feature; engine untouched:**
+- **Model**: `AudioMix { volume, fadeIn, fadeOut }` (fades in ms) + `audioMix` state, `setAudioMix` (live;
+  Inspector volume slider pushes history on pointer-down), `setAudioDuration` (patches the singleton audio
+  track once its natural length is probed on import).
+- **Preview** (`audioPreview.ts`): lazy `AudioContext`; per-src cached `MediaElementSource → GainNode →
+  destination`. `fadeGain` computes the gain envelope (volume, fade-in/out, guarded for unknown duration);
+  `syncAudio` resumes the ctx, sets gain, re-seeks on >0.3s drift, plays/pauses; `stopAudio` halts all.
+  Wired into PreviewMonitor's master-clock loop (+ stop on pause/end/unmount).
+- **Waveform**: `getPeaks(src, buckets)` decodes once (cached) → normalized peaks; `AudioWaveform` canvas
+  draws them in the timeline audio lane, sized to the bar (redraws on zoom), with fade-in/out wedges +
+  "🎵 name · NN%" overlay.
+- **Inspector** Audio section: volume slider + fade-in/out (seconds) → `setAudioMix`.
+- **Export** matches preview: `exportSession.encode` appends `-af volume=…,afade=t=in…,afade=t=out…`
+  (fade-out start = videoDur − fadeOut); `ExportEncodeRequest` gains `audioVolume/audioFadeIn/audioFadeOut`,
+  passed from ExportWindow.
+- **Persistence**: `audioMix` saved/restored in `serialize.ts` (+ audio duration already in `strip`).
+- typecheck ✅ · build ✅. **All 5 stages (multi-track + transitions + text + colour + audio) shipped.**
+
+**Next:** M8 (backgrounds / code layers), M9 (autosave + packaging); optionally mux video clips' own audio.
+
+---
+
 ## 2026-06-22 — Multi-track Stage 4 (transitions)
 **Done — per-clip in/out transitions, engine untouched:**
 - Chose **per-clip in/out transitions** over overlap-based cross-fades (the engine renders one clip per

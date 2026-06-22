@@ -41,7 +41,18 @@ function encode(
     const args = ["-y", "-framerate", String(req.fps), "-i", join(dir, "frame-%05d.png")];
     if (req.audioPath) args.push("-i", req.audioPath);
     args.push("-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "medium");
-    if (req.audioPath) args.push("-c:a", "aac", "-b:a", "192k", "-shortest");
+    if (req.audioPath) {
+      // volume + fades, matching the Web Audio preview
+      const af: string[] = [];
+      if (req.audioVolume != null && req.audioVolume !== 1) af.push(`volume=${req.audioVolume}`);
+      if (req.audioFadeIn) af.push(`afade=t=in:st=0:d=${req.audioFadeIn}`);
+      if (req.audioFadeOut) {
+        const vidDur = req.total / req.fps;
+        af.push(`afade=t=out:st=${Math.max(0, vidDur - req.audioFadeOut).toFixed(3)}:d=${req.audioFadeOut}`);
+      }
+      if (af.length) args.push("-af", af.join(","));
+      args.push("-c:a", "aac", "-b:a", "192k", "-shortest");
+    }
     args.push("-movflags", "+faststart", outPath);
 
     const ff = spawn(FFMPEG, args);

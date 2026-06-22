@@ -2,7 +2,7 @@
 
 Updated: 2026-06-22 · Legend: ✅ done · 🔨 in progress · ❌ not started
 
-## Current milestone: **Multi-track core done (Stage 1) → Stage 2 (text layers) next**
+## Current milestone: **Multi-track + all 4 OpenReel features done (Stages 1–5 ✅)**
 
 The first end-to-end vertical slice works: **import images/video → arrange on N timeline tracks → preview → export MP4 (native ffmpeg)** at 720p/1080p/4K/8K, optional audio muxed in.
 
@@ -12,7 +12,7 @@ Premiere-style N tracks: each track has free-positioned clips (gaps allowed); hi
 - **Stage 2 — Text / caption layers** ✅ `text` clip type, canvas-rendered (res-independent fontSize, multi-line, align, colour, box), Inspector text controls (content/font/size/weight/align/colour/box), +Text button + `T` key, keyframe-animatable like any clip.
 - **Stage 3 — Colour / filters** ✅ per-clip `filters` (brightness/contrast/saturation/hue/blur, blur res-independent) applied via canvas `ctx.filter`; 8 presets (Vivid/B&W/Noir/Warm/Cool/Vintage/Dream); Inspector Colour section (preset grid + sliders, double-click to reset a slider). Preview == export.
 - **Stage 4 — Transitions** ✅ per-clip in/out transitions (fade / slide / wipe + direction + duration) rendered within the clip's own span (no engine change — `transEnv` modulates alpha / offset / reveal-rect in `composite`); works on media + text; Inspector Transitions section; corner wedges on timeline clips.
-- Stage 5 — Audio waveform + volume + fades (audio → track clips) ❌
+- **Stage 5 — Audio waveform + volume + fades** ✅ Web Audio preview (AudioContext → gain, fade envelope, drift-corrected sync in PreviewMonitor); decoded **waveform peaks drawn in the timeline audio lane** (+ fade-in/out wedges, volume %); Inspector Audio section (volume slider + fade-in/out seconds); audio duration probed on import; **export applies `volume=` + `afade=` via ffmpeg `-af`** so render matches preview; `audioMix` persisted in project save.
 
 | Area | State | Notes |
 |---|---|---|
@@ -26,7 +26,7 @@ Premiere-style N tracks: each track has free-positioned clips (gaps allowed); hi
 | M4 — Inspector | ✅ | comp (bg/fps) + clip transform with **keyframes (◆) + easing + motion presets** + fit, duration, video trim |
 | M5 — Project I/O | ✅ | save/open .json serializes full editor (comp+media-by-path+clips+audio); media re-read on open · autosave → M9 |
 | M6 — Export (native ffmpeg) | ✅ | canvas frames → ffmpeg H.264 mp4, 720p–8K + audio mux |
-| M7 — Media + Audio | 🔨 | image/**video**/audio import (buttons + drag&drop) ✅ · video plays in preview + renders in export ✅ · video's own audio + Web Audio preview = later |
+| M7 — Media + Audio | ✅ | image/**video**/audio import (buttons + drag&drop) ✅ · video plays in preview + renders in export ✅ · **Web Audio preview + waveform + volume + fades** ✅ · video's own audio mux = later |
 | M8 — Backgrounds + Code layers | ❌ | port |
 | M9 — Polish + Package | ❌ | |
 

@@ -11,6 +11,9 @@ export interface ExportEncodeRequest {
   width: number;
   height: number;
   audioPath?: string; // optional audio track to mux in
+  audioVolume?: number; // gain multiplier (1 = unchanged)
+  audioFadeIn?: number; // seconds
+  audioFadeOut?: number; // seconds
 }
 
 export interface ExportProgress {

@@ -14,6 +14,14 @@ function fillVideoDuration(id: string, src: string): void {
   });
 }
 
+// Read an audio file's natural duration (ms) and store it on the audio track.
+function fillAudioDuration(src: string): void {
+  const el = new Audio(src);
+  el.addEventListener("loadedmetadata", () => {
+    if (el.duration) useEditor.getState().setAudioDuration(el.duration * 1000);
+  });
+}
+
 // ---- Dialog-based import (buttons + File menu) -----------------------------
 
 export async function importImages(): Promise<void> {
@@ -28,7 +36,9 @@ export async function importAudio(): Promise<void> {
   const items = await window.api.media.import("audio");
   const m = items?.[0];
   if (!m) return;
-  useEditor.getState().setAudio({ kind: m.kind, name: m.name, path: m.path, src: m.dataUrl ?? "" });
+  const src = m.dataUrl ?? "";
+  useEditor.getState().setAudio({ kind: m.kind, name: m.name, path: m.path, src });
+  if (src) fillAudioDuration(src);
 }
 
 export async function importVideos(): Promise<void> {
@@ -99,6 +109,7 @@ export async function importDroppedFiles(files: FileList | File[]): Promise<Drop
   }
   if (audio) {
     st.setAudio(audio);
+    if (audio.src) fillAudioDuration(audio.src);
     res.audio = 1;
   }
   return res;

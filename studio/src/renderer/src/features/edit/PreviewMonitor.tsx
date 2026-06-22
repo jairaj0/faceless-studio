@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useEditor } from "../../store/editor";
 import { drawFrame, getImage, getVideo, localTime, pauseVideos, visibleClipsAt } from "./composite";
+import { syncAudio, stopAudio } from "./audioPreview";
 
 export function fmtTime(ms: number): string {
   const s = Math.max(0, ms) / 1000;
@@ -83,11 +84,13 @@ export function PreviewMonitor() {
         if (v.paused) void v.play();
       }
       pauseVideos(keep); // pause anything no longer on screen
+      syncAudio(st.audio?.src ?? null, st.audioMix, st.audio?.duration ?? 0, next, true);
 
       if (next >= total) {
         st.setPlayhead(total);
         st.pause();
         pauseVideos();
+        stopAudio();
         return;
       }
       st.setPlayhead(next);
@@ -97,8 +100,18 @@ export function PreviewMonitor() {
     return () => cancelAnimationFrame(raf);
   }, [playing]);
 
-  // Pause any playing video when the monitor unmounts.
-  useEffect(() => () => pauseVideos(), []);
+  // Pause audio whenever playback stops.
+  useEffect(() => {
+    if (!playing) stopAudio();
+  }, [playing]);
+
+  // Pause any playing video/audio when the monitor unmounts.
+  useEffect(() => {
+    return () => {
+      pauseVideos();
+      stopAudio();
+    };
+  }, []);
 
   return (
     <div

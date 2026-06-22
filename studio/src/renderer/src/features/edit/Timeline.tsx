@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditor, allClips, type Clip, type Track, type TransformKey } from "../../store/editor";
 import { fmtTime } from "./PreviewMonitor";
+import { getPeaks } from "./audioPreview";
 
 const HEADER_W = 116;
 const RULER_H = 22;
@@ -30,6 +31,7 @@ export function Timeline() {
   const media = useEditor((s) => s.media);
   const tracks = useEditor((s) => s.tracks);
   const audio = useEditor((s) => s.audio);
+  const audioMix = useEditor((s) => s.audioMix);
   const playhead = useEditor((s) => s.playhead);
   const selectedClipId = useEditor((s) => s.selectedClipId);
   const selectedKeyframe = useEditor((s) => s.selectedKeyframe);
@@ -512,29 +514,41 @@ export function Timeline() {
               🎵 Audio
             </div>
             <div style={{ position: "relative", width: contentW, background: "var(--bg)" }}>
-              {audio && (
-                <div
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    top: 4,
-                    height: AUDIO_H - 10,
-                    width: (audio.duration ?? total) * pxMs || contentW,
-                    borderRadius: 4,
-                    background: "linear-gradient(180deg,#2a6f5a,#1d4f40)",
-                    border: "1px solid var(--border)",
-                    display: "flex",
-                    alignItems: "center",
-                    padding: "0 6px",
-                    fontSize: 10,
-                    color: "#cfe",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                  }}
-                >
-                  {audio.name}
-                </div>
-              )}
+              {audio &&
+                (() => {
+                  const aw = (audio.duration ? audio.duration * pxMs : contentW) || contentW;
+                  const dur = audio.duration ?? 0;
+                  const fiW = dur ? (audioMix.fadeIn / dur) * aw : 0;
+                  const foW = dur ? (audioMix.fadeOut / dur) * aw : 0;
+                  const h = AUDIO_H - 10;
+                  return (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: 4,
+                        height: h,
+                        width: aw,
+                        borderRadius: 4,
+                        overflow: "hidden",
+                        background: "linear-gradient(180deg,#2a6f5a,#1d4f40)",
+                        border: "1px solid var(--border)",
+                      }}
+                    >
+                      <AudioWaveform src={audio.src} width={aw} height={h} />
+                      {/* fade-in / fade-out wedges */}
+                      {fiW > 1 && (
+                        <div style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0, borderStyle: "solid", borderWidth: `${h}px 0 0 ${Math.min(fiW, aw)}px`, borderColor: "transparent transparent transparent rgba(0,0,0,0.55)" }} />
+                      )}
+                      {foW > 1 && (
+                        <div style={{ position: "absolute", right: 0, top: 0, width: 0, height: 0, borderStyle: "solid", borderWidth: `0 ${Math.min(foW, aw)}px ${h}px 0`, borderColor: `transparent rgba(0,0,0,0.55) transparent transparent` }} />
+                      )}
+                      <span style={{ position: "absolute", left: 6, top: 2, fontSize: 10, color: "#dff", textShadow: "0 1px 2px rgba(0,0,0,0.8)", whiteSpace: "nowrap", pointerEvents: "none" }}>
+                        🎵 {audio.name} · {Math.round(audioMix.volume * 100)}%
+                      </span>
+                    </div>
+                  );
+                })()}
             </div>
           </div>
 
@@ -621,6 +635,36 @@ export function Timeline() {
       )}
     </div>
   );
+}
+
+// Decodes the audio once (cached) and draws its peaks into a canvas sized to
+// the clip bar. Redraws when the bar width changes (zoom).
+function AudioWaveform({ src, width, height }: { src: string; width: number; height: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const w = Math.max(1, Math.round(width));
+    getPeaks(src, Math.min(2000, w))
+      .then((peaks) => {
+        if (cancelled) return;
+        const cv = ref.current;
+        const ctx = cv?.getContext("2d");
+        if (!cv || !ctx) return;
+        ctx.clearRect(0, 0, w, height);
+        ctx.fillStyle = "rgba(220,255,245,0.8)";
+        const mid = height / 2;
+        const bw = w / peaks.length;
+        for (let i = 0; i < peaks.length; i++) {
+          const ph = Math.max(1, peaks[i] * (height - 6));
+          ctx.fillRect(i * bw, mid - ph / 2, Math.max(1, bw - 0.5), ph);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [src, width, height]);
+  return <canvas ref={ref} width={Math.max(1, Math.round(width))} height={height} style={{ display: "block", width, height }} />;
 }
 
 // Evenly spaced "nice" tick times across the visible content.

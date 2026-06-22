@@ -96,6 +96,14 @@ export interface TransitionSpec {
 }
 export const DEFAULT_TRANSITION: TransitionSpec = { type: "fade", dir: "left", duration: 500 };
 
+// Mix applied to the (single) audio track: gain + fade in/out (ms).
+export interface AudioMix {
+  volume: number; // 0..1.5
+  fadeIn: number; // ms
+  fadeOut: number; // ms
+}
+export const DEFAULT_MIX: AudioMix = { volume: 1, fadeIn: 0, fadeOut: 0 };
+
 // One clip living inside a track. Times are in milliseconds. Clips are
 // free-positioned on the timeline now (explicit `start`, gaps allowed). A clip
 // is either backed by `media` (mediaId) or is a `text` layer (text spec).
@@ -200,6 +208,7 @@ interface EditorState {
   media: MediaItem[];
   tracks: Track[];
   audio: MediaItem | null;
+  audioMix: AudioMix;
   comp: Composition;
   playhead: number;
   playing: boolean;
@@ -244,6 +253,8 @@ interface EditorState {
   resetTransform: (id: string) => void;
 
   setAudio: (item: NewMedia | null) => void;
+  setAudioDuration: (ms: number) => void;
+  setAudioMix: (partial: Partial<AudioMix>) => void;
   updateComp: (partial: Partial<Composition>) => void;
   setPlayhead: (ms: number) => void;
   play: () => void;
@@ -282,6 +293,7 @@ export const useEditor = create<EditorState>((set, get) => {
     media: [],
     tracks: [newTrack("V1")],
     audio: null,
+    audioMix: { ...DEFAULT_MIX },
     comp: { width: 1920, height: 1080, fps: 30, bg: "#000000" },
     playhead: 0,
     playing: false,
@@ -630,8 +642,14 @@ export const useEditor = create<EditorState>((set, get) => {
     setAudio: (item) =>
       set((s) => {
         revoke(s.audio);
-        return { audio: item ? { ...item, id: uid() } : null };
+        return { audio: item ? { ...item, id: uid() } : null, audioMix: { ...DEFAULT_MIX } };
       }),
+
+    setAudioDuration: (ms) =>
+      set((s) => ({ audio: s.audio ? { ...s.audio, duration: ms } : null })),
+
+    // Live; the volume slider pushes history on pointer-down.
+    setAudioMix: (partial) => set((s) => ({ audioMix: { ...s.audioMix, ...partial } })),
 
     updateComp: (partial) => set((s) => ({ ...push(s), comp: { ...s.comp, ...partial } })),
 
@@ -689,6 +707,7 @@ export const useEditor = create<EditorState>((set, get) => {
           media: [],
           tracks: [newTrack("V1")],
           audio: null,
+          audioMix: { ...DEFAULT_MIX },
           playhead: 0,
           playing: false,
           selectedClipId: null,

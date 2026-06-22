@@ -18,6 +18,7 @@ export function ExportWindow() {
   const tracks = useEditor((s) => s.tracks);
   const comp = useEditor((s) => s.comp);
   const audio = useEditor((s) => s.audio);
+  const audioMix = useEditor((s) => s.audioMix);
   const duration = useEditor((s) => s.duration());
 
   const [presetH, setPresetH] = useState(1080);
@@ -67,6 +68,9 @@ export function ExportWindow() {
         width: W,
         height: H,
         audioPath: audio?.path,
+        audioVolume: audioMix.volume,
+        audioFadeIn: audioMix.fadeIn / 1000,
+        audioFadeOut: audioMix.fadeOut / 1000,
       });
       setResult(res);
     } catch (err) {

@@ -1,6 +1,8 @@
 import {
   useEditor,
   DEFAULT_TRANSFORM,
+  DEFAULT_MIX,
+  type AudioMix,
   type Clip,
   type Composition,
   type MediaItem,
@@ -25,6 +27,7 @@ export interface ProjectEditor {
   tracks?: Track[]; // v3: multi-track
   clips?: Clip[]; // v2: single track (migrated on open)
   audio: SerializedMedia | null;
+  audioMix?: AudioMix;
 }
 
 const strip = (m: MediaItem): SerializedMedia => ({
@@ -42,6 +45,7 @@ export function serializeEditor(): ProjectEditor {
     media: s.media.map(strip),
     tracks: s.tracks,
     audio: s.audio ? strip(s.audio) : null,
+    audioMix: s.audioMix,
   };
 }
 
@@ -107,6 +111,7 @@ export async function hydrateEditor(d: ProjectEditor): Promise<void> {
     media,
     tracks: migrateTracks(d, ids),
     audio,
+    audioMix: { ...DEFAULT_MIX, ...(d.audioMix ?? {}) },
     playhead: 0,
     playing: false,
     selectedClipId: null,

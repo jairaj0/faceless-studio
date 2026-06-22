@@ -62,6 +62,9 @@ export function Inspector() {
   const tracks = useEditor((s) => s.tracks);
   const media = useEditor((s) => s.media);
   const comp = useEditor((s) => s.comp);
+  const audio = useEditor((s) => s.audio);
+  const audioMix = useEditor((s) => s.audioMix);
+  const setAudioMix = useEditor((s) => s.setAudioMix);
   const playhead = useEditor((s) => s.playhead);
   const selectedId = useEditor((s) => s.selectedClipId);
   const selectedKeyframe = useEditor((s) => s.selectedKeyframe);
@@ -134,6 +137,47 @@ export function Inspector() {
           </span>
         </Field>
       </Section>
+
+      {audio && (
+        <Section title={`Audio · ${audio.name}`}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 11, color: "var(--fg-2)", flex: 1 }}>Volume</span>
+              <span style={{ fontSize: 11, color: "var(--fg-3)" }}>{Math.round(audioMix.volume * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={1.5}
+              step={0.01}
+              value={audioMix.volume}
+              onPointerDown={pushHistory}
+              onChange={(e) => setAudioMix({ volume: Number(e.target.value) })}
+              style={{ width: "100%", accentColor: "var(--accent)" }}
+            />
+          </div>
+          <Field label="Fade in (s)">
+            <input
+              type="number"
+              min={0}
+              step={0.1}
+              value={(audioMix.fadeIn / 1000).toFixed(1)}
+              onChange={(e) => setAudioMix({ fadeIn: Math.max(0, Number(e.target.value) * 1000) })}
+              style={numStyle}
+            />
+          </Field>
+          <Field label="Fade out (s)">
+            <input
+              type="number"
+              min={0}
+              step={0.1}
+              value={(audioMix.fadeOut / 1000).toFixed(1)}
+              onChange={(e) => setAudioMix({ fadeOut: Math.max(0, Number(e.target.value) * 1000) })}
+              style={numStyle}
+            />
+          </Field>
+        </Section>
+      )}
 
       {!clip || (!m && !isText) ? (
         <div style={{ padding: 16, fontSize: 11, color: "var(--fg-3)" }}>
