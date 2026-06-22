@@ -85,6 +85,17 @@ export const FILTER_PRESETS: { id: string; label: string; f: FilterSpec }[] = [
   { id: "dream", label: "Dream", f: { brightness: 1.1, contrast: 0.95, saturate: 1.2, blur: 0.004, hue: 0 } },
 ];
 
+// An in/out transition played within the clip's own span (engine-preserving:
+// no overlap rendering needed). fade = alpha; slide = move on/off; wipe = reveal.
+export type TransitionType = "fade" | "slide" | "wipe";
+export type TransitionDir = "left" | "right" | "up" | "down";
+export interface TransitionSpec {
+  type: TransitionType;
+  dir: TransitionDir;
+  duration: number; // ms
+}
+export const DEFAULT_TRANSITION: TransitionSpec = { type: "fade", dir: "left", duration: 500 };
+
 // One clip living inside a track. Times are in milliseconds. Clips are
 // free-positioned on the timeline now (explicit `start`, gaps allowed). A clip
 // is either backed by `media` (mediaId) or is a `text` layer (text spec).
@@ -99,6 +110,8 @@ export interface Clip {
   transform: Transform;
   text?: TextSpec; // present when type === "text"
   filters?: FilterSpec; // colour grade (media clips)
+  transIn?: TransitionSpec; // entrance transition
+  transOut?: TransitionSpec; // exit transition
 }
 
 // A horizontal lane. Tracks composite bottom (index 0) → top (last).
@@ -210,6 +223,7 @@ interface EditorState {
   updateText: (id: string, partial: Partial<TextSpec>) => void;
   updateFilters: (id: string, partial: Partial<FilterSpec>) => void;
   applyFilterPreset: (id: string, presetId: string) => void;
+  setTransition: (id: string, slot: "in" | "out", spec: TransitionSpec | null) => void;
   removeClip: (id: string) => void;
   duplicateClip: (id: string) => void;
   splitClip: (id: string, atMs: number) => void;
@@ -385,6 +399,15 @@ export const useEditor = create<EditorState>((set, get) => {
         if (!preset) return {};
         return { ...push(s), tracks: mapClip(id, (c) => ({ ...c, filters: { ...preset.f } })) };
       }),
+
+    setTransition: (id, slot, spec) =>
+      set((s) => ({
+        ...push(s),
+        tracks: mapClip(id, (c) => ({
+          ...c,
+          [slot === "in" ? "transIn" : "transOut"]: spec ?? undefined,
+        })),
+      })),
 
     removeClip: (id) =>
       set((s) => ({

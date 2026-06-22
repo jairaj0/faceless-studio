@@ -418,6 +418,18 @@ export function Timeline() {
                         >
                           {isText ? `T ${c.text?.content ?? ""}` : `${m?.kind === "video" ? "🎞 " : ""}${m?.name ?? "missing"}`}
                         </div>
+                        {c.transIn && (
+                          <div
+                            title={`In: ${c.transIn.type}`}
+                            style={{ position: "absolute", top: 0, left: 0, width: 0, height: 0, borderStyle: "solid", borderWidth: "14px 14px 0 0", borderColor: "var(--accent) transparent transparent transparent", opacity: 0.85 }}
+                          />
+                        )}
+                        {c.transOut && (
+                          <div
+                            title={`Out: ${c.transOut.type}`}
+                            style={{ position: "absolute", top: 0, right: 0, width: 0, height: 0, borderStyle: "solid", borderWidth: "0 14px 14px 0", borderColor: "transparent var(--accent) transparent transparent", opacity: 0.85 }}
+                          />
+                        )}
                         {!track.locked && (
                           <>
                             <div

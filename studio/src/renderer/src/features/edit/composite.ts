@@ -2,6 +2,43 @@ import type { Clip, Composition, FilterSpec, MediaItem, Track } from "../../stor
 import { allClips, TF_DEFAULT } from "../../store/editor";
 import { evalProp } from "./animate";
 
+// In/out transition state at a clip-local time: an alpha multiplier, a
+// screen-space offset (slide), and an optional reveal rect (wipe).
+interface TransEnv {
+  alpha: number;
+  dx: number;
+  dy: number;
+  wipe: [number, number, number, number] | null;
+}
+
+function transEnv(clip: Clip, localT: number, W: number, H: number): TransEnv {
+  const base: TransEnv = { alpha: 1, dx: 0, dy: 0, wipe: null };
+  const dur = clip.duration;
+  let spec = null;
+  let p = 1; // 0 = fully transitioned-out/not-yet-in, 1 = fully present
+  if (clip.transIn && clip.transIn.duration > 0 && localT < clip.transIn.duration) {
+    spec = clip.transIn;
+    p = Math.max(0, Math.min(1, localT / spec.duration));
+  } else if (clip.transOut && clip.transOut.duration > 0 && localT > dur - clip.transOut.duration) {
+    spec = clip.transOut;
+    p = Math.max(0, Math.min(1, (dur - localT) / spec.duration));
+  }
+  if (!spec) return base;
+  if (spec.type === "fade") return { ...base, alpha: p };
+  if (spec.type === "slide") {
+    const d = 1 - p;
+    if (spec.dir === "left") return { ...base, dx: -d * W };
+    if (spec.dir === "right") return { ...base, dx: d * W };
+    if (spec.dir === "up") return { ...base, dy: -d * H };
+    return { ...base, dy: d * H };
+  }
+  // wipe: a rectangular reveal that grows with p
+  if (spec.dir === "left") return { ...base, wipe: [0, 0, p * W, H] };
+  if (spec.dir === "right") return { ...base, wipe: [W - p * W, 0, p * W, H] };
+  if (spec.dir === "up") return { ...base, wipe: [0, 0, W, p * H] };
+  return { ...base, wipe: [0, H - p * H, W, p * H] };
+}
+
 // Decoded media cached by src URL. Both preview and export draw through here so
 // what you see is what gets rendered.
 const imgCache = new Map<string, HTMLImageElement>();
@@ -180,10 +217,16 @@ function drawSource(
   const rotation = evalProp(tf.rotation, localT, TF_DEFAULT.rotation);
   const opacity = evalProp(tf.opacity, localT, TF_DEFAULT.opacity);
 
+  const env = transEnv(clip, localT, W, H);
   ctx.save();
-  ctx.globalAlpha = Math.max(0, Math.min(1, opacity));
+  ctx.globalAlpha = Math.max(0, Math.min(1, opacity)) * env.alpha;
+  if (env.wipe) {
+    ctx.beginPath();
+    ctx.rect(env.wipe[0], env.wipe[1], env.wipe[2], env.wipe[3]);
+    ctx.clip();
+  }
   ctx.filter = filterString(clip.filters, H);
-  ctx.translate(W / 2 + x * W, H / 2 + y * H);
+  ctx.translate(W / 2 + x * W + env.dx, H / 2 + y * H + env.dy);
   ctx.rotate((rotation * Math.PI) / 180);
   ctx.scale(scale, scale);
   ctx.drawImage(src, -dw / 2, -dh / 2, dw, dh);
@@ -221,9 +264,15 @@ function drawText(ctx: CanvasRenderingContext2D, comp: Composition, clip: Clip, 
   const lineH = fontPx * 1.25;
   const totalH = lines.length * lineH;
 
+  const env = transEnv(clip, localT, W, H);
   ctx.save();
-  ctx.globalAlpha = Math.max(0, Math.min(1, opacity));
-  ctx.translate(W / 2 + x * W, H / 2 + y * H);
+  ctx.globalAlpha = Math.max(0, Math.min(1, opacity)) * env.alpha;
+  if (env.wipe) {
+    ctx.beginPath();
+    ctx.rect(env.wipe[0], env.wipe[1], env.wipe[2], env.wipe[3]);
+    ctx.clip();
+  }
+  ctx.translate(W / 2 + x * W + env.dx, H / 2 + y * H + env.dy);
   ctx.rotate((rotation * Math.PI) / 180);
   ctx.scale(scale, scale);
   ctx.font = `${spec.fontWeight} ${fontPx}px ${spec.fontFamily}`;

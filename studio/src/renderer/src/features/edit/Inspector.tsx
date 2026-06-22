@@ -4,9 +4,13 @@ import {
   findClip,
   DEFAULT_FILTERS,
   FILTER_PRESETS,
+  DEFAULT_TRANSITION,
   type FitMode,
   type FilterSpec,
   type TransformKey,
+  type TransitionSpec,
+  type TransitionType,
+  type TransitionDir,
 } from "../../store/editor";
 import { EASING_OPTIONS, type EasingName } from "./animate";
 
@@ -26,6 +30,14 @@ const FONTS = [
   { label: "Mono", value: "'SF Mono', Menlo, monospace" },
 ];
 const ALIGNS: ("left" | "center" | "right")[] = ["left", "center", "right"];
+const TRANS_TYPES: { id: TransitionType | "none"; label: string }[] = [
+  { id: "none", label: "None" },
+  { id: "fade", label: "Fade" },
+  { id: "slide", label: "Slide" },
+  { id: "wipe", label: "Wipe" },
+];
+const TRANS_DIRS: TransitionDir[] = ["left", "right", "up", "down"];
+const DIR_ARROW: Record<TransitionDir, string> = { left: "⬅", right: "➡", up: "⬆", down: "⬇" };
 
 const ROWS: { key: TransformKey; label: string; min: number; max: number; step: number; pct?: boolean; deg?: boolean }[] = [
   { key: "scale", label: "Scale", min: 0.1, max: 4, step: 0.01, pct: true },
@@ -66,6 +78,7 @@ export function Inspector() {
   const updateText = useEditor((s) => s.updateText);
   const updateFilters = useEditor((s) => s.updateFilters);
   const applyFilterPreset = useEditor((s) => s.applyFilterPreset);
+  const setTransition = useEditor((s) => s.setTransition);
   const pushHistory = useEditor((s) => s.pushHistory);
 
   const clip = findClip(tracks, selectedId);
@@ -366,6 +379,56 @@ export function Inspector() {
               </button>
             </Section>
           )}
+
+          <Section title="Transitions">
+            {(["in", "out"] as const).map((slot) => {
+              const spec = slot === "in" ? clip.transIn : clip.transOut;
+              const set = (next: TransitionSpec | null): void => setTransition(clip.id, slot, next);
+              return (
+                <div key={slot} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 11, color: "var(--fg-2)", fontWeight: 600 }}>{slot === "in" ? "In" : "Out"}</span>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {TRANS_TYPES.map((tt) => {
+                      const on = (spec?.type ?? "none") === tt.id;
+                      return (
+                        <button
+                          key={tt.id}
+                          onClick={() =>
+                            set(tt.id === "none" ? null : { ...DEFAULT_TRANSITION, ...spec, type: tt.id })
+                          }
+                          style={segBtn(on)}
+                        >
+                          {tt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {spec && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {spec.type !== "fade" && (
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {TRANS_DIRS.map((d) => (
+                            <button key={d} onClick={() => set({ ...spec, dir: d })} style={{ ...segBtn(spec.dir === d), flex: "none", width: 24 }}>
+                              {DIR_ARROW[d]}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--fg-2)" }}>Dur</span>
+                      <input
+                        type="number"
+                        min={0.1}
+                        step={0.1}
+                        value={(spec.duration / 1000).toFixed(1)}
+                        onChange={(e) => set({ ...spec, duration: Math.max(100, Number(e.target.value) * 1000) })}
+                        style={numStyle}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </Section>
 
           <Section title="Timing">
             <Field label="Duration (s)">

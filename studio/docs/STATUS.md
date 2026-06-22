@@ -11,7 +11,7 @@ Premiere-style N tracks: each track has free-positioned clips (gaps allowed); hi
 - **Stage 1 — multi-track core** ✅ tracks model, compositing bottom→top, vertical+horizontal clip drag, add/remove track, per-track controls, master-clock playback, v2→v3 save migration.
 - **Stage 2 — Text / caption layers** ✅ `text` clip type, canvas-rendered (res-independent fontSize, multi-line, align, colour, box), Inspector text controls (content/font/size/weight/align/colour/box), +Text button + `T` key, keyframe-animatable like any clip.
 - **Stage 3 — Colour / filters** ✅ per-clip `filters` (brightness/contrast/saturation/hue/blur, blur res-independent) applied via canvas `ctx.filter`; 8 presets (Vivid/B&W/Noir/Warm/Cool/Vintage/Dream); Inspector Colour section (preset grid + sliders, double-click to reset a slider). Preview == export.
-- Stage 4 — Transitions (cross-fade / wipe / slide) ❌
+- **Stage 4 — Transitions** ✅ per-clip in/out transitions (fade / slide / wipe + direction + duration) rendered within the clip's own span (no engine change — `transEnv` modulates alpha / offset / reveal-rect in `composite`); works on media + text; Inspector Transitions section; corner wedges on timeline clips.
 - Stage 5 — Audio waveform + volume + fades (audio → track clips) ❌
 
 | Area | State | Notes |

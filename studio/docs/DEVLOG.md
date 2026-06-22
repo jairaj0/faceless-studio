@@ -4,6 +4,24 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — Multi-track Stage 4 (transitions)
+**Done — per-clip in/out transitions, engine untouched:**
+- Chose **per-clip in/out transitions** over overlap-based cross-fades (the engine renders one clip per
+  track via `clipAt`, so a true same-track overlap dissolve would need an engine change — out of scope).
+  A transition plays inside the clip's own span: `transIn` fades/slides/wipes it on at the head, `transOut`
+  off at the tail. Adjacent same-track clips with out+in ≈ a cross dissolve through the background.
+- **Model**: `TransitionSpec { type: fade|slide|wipe; dir; duration }`, `Clip.transIn?/transOut?`,
+  action `setTransition(id, slot, spec|null)`.
+- **Render** (`composite.ts` `transEnv`): pure fn → `{alpha, dx, dy, wipe-rect}` at clip-local time;
+  applied in both `drawSource` and `drawText` (alpha mult, screen-space translate for slide, `ctx.clip`
+  rect for wipe). Same path → preview == export.
+- **Inspector**: Transitions section (In / Out × type buttons + direction arrows + duration) for any clip.
+- **Timeline**: accent corner wedges mark clips that have an in/out transition. typecheck + build green.
+
+**Next:** Stage 5 — audio waveform + per-clip volume + fades (the last of the 4 OpenReel features).
+
+---
+
 ## 2026-06-22 — Multi-track Stage 3 (colour / filters)
 **Done — per-clip colour grade:**
 - **Model**: `Clip.filters?: FilterSpec` (brightness/contrast/saturate multipliers, hue°, blur as a
