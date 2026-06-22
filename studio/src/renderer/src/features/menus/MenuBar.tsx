@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
 import { MENU_CATALOG, type MenuDef } from "./menuCatalog";
 import { getCommand, isEnabled, runCommand } from "../../commands";
-import { useApp } from "../../store";
+import { useApp, type AppView } from "../../store";
+
+const WINDOWS: { id: AppView; label: string }[] = [
+  { id: "edit", label: "Edit" },
+  { id: "import", label: "Import & Preview" },
+  { id: "export", label: "Export" },
+];
 
 export function MenuBar() {
   const [open, setOpen] = useState<string | null>(null);
   const projectName = useApp((s) => s.projectName);
+  const view = useApp((s) => s.view);
+  const setView = useApp((s) => s.setView);
 
   // close on outside click
   useEffect(() => {
@@ -56,6 +64,47 @@ export function MenuBar() {
           onClose={() => setOpen(null)}
         />
       ))}
+
+      {/* divider */}
+      <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 8px" }} />
+
+      {/* window switcher — shows current window, click to switch */}
+      {WINDOWS.map((w) => {
+        const active = w.id === view;
+        return (
+          <button
+            key={w.id}
+            onClick={() => setView(w.id)}
+            style={{
+              position: "relative",
+              padding: "0 10px",
+              height: "100%",
+              background: "none",
+              border: "none",
+              color: active ? "var(--fg)" : "var(--fg-3)",
+              fontSize: 12,
+              fontWeight: active ? 600 : 400,
+              cursor: "pointer",
+            }}
+          >
+            {w.label}
+            {active && (
+              <span
+                style={{
+                  position: "absolute",
+                  left: 8,
+                  right: 8,
+                  bottom: 0,
+                  height: 2,
+                  background: "var(--accent)",
+                  borderRadius: 2,
+                }}
+              />
+            )}
+          </button>
+        );
+      })}
+
       <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--fg-3)" }}>
         {projectName}
       </span>
