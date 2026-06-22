@@ -61,6 +61,11 @@ export function PreviewMonitor() {
     if (!playing) return;
     let raf = 0;
     let last = performance.now();
+    // Which clip is currently driving native video playback. We seek + play ONCE
+    // on entering a video clip, then just read its time — never re-seek every frame
+    // (that races with the async play() and freezes the video, so it never advances
+    // to the next clip).
+    let activeClip: string | null = null;
     const step = (now: number): void => {
       const dt = now - last;
       last = now;
@@ -73,15 +78,24 @@ export function PreviewMonitor() {
       let next = ph + dt;
       if (clip && m?.kind === "video") {
         const v = getVideo(m.src);
-        pauseVideos(m.src);
-        if (v.paused) {
+        if (activeClip !== clip.id) {
+          // Entering this video clip: stop other videos, seek to the in-point once, play once.
+          pauseVideos(m.src);
+          activeClip = clip.id;
           v.currentTime = localTime(clip, m, ph);
           void v.play();
         }
-        const within = v.currentTime * 1000;
-        next = v.ended || within >= clip.duration ? clip.start + clip.duration : clip.start + within;
+        // Elapsed time inside this clip = video time minus its trim in-point.
+        const elapsed = v.currentTime * 1000 - clip.trimStart;
+        if (v.ended || elapsed >= clip.duration - 1) {
+          next = clip.start + clip.duration; // hand off to the next clip (image or video)
+          activeClip = null;
+        } else {
+          next = clip.start + Math.max(0, elapsed);
+        }
       } else {
-        pauseVideos();
+        if (activeClip) pauseVideos();
+        activeClip = null;
       }
 
       if (next >= total) {
