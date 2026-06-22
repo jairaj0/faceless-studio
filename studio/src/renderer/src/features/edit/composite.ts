@@ -91,7 +91,7 @@ export function clipAt(clips: Clip[], t: number): Clip | null {
 
 /** Local time within a clip's source media, in seconds, clamped to its length. */
 export function localTime(clip: Clip, m: MediaItem, t: number): number {
-  const sec = (t - clip.start) / 1000;
+  const sec = (clip.trimStart + (t - clip.start)) / 1000;
   const max = m.duration ? m.duration / 1000 - 0.05 : sec;
   return Math.max(0, Math.min(sec, max));
 }
@@ -128,19 +128,36 @@ export async function prepareFrame(media: MediaItem[], clips: Clip[], t: number)
   await seek(v, localTime(clip, m, t));
 }
 
-function contain(
+// Draw a source with the clip's fit mode + transform. Positions/scale are
+// fractions of the comp, so the result is identical at any export resolution.
+function drawSource(
   ctx: CanvasRenderingContext2D,
-  W: number,
-  H: number,
+  comp: Composition,
   src: CanvasImageSource,
   sw: number,
   sh: number,
+  clip: Clip,
 ): void {
   if (!sw || !sh) return;
-  const scale = Math.min(W / sw, H / sh);
-  const w = sw * scale;
-  const h = sh * scale;
-  ctx.drawImage(src, (W - w) / 2, (H - h) / 2, w, h);
+  const { width: W, height: H } = comp;
+  let dw: number;
+  let dh: number;
+  if (clip.fit === "fill") {
+    dw = W;
+    dh = H;
+  } else {
+    const base = clip.fit === "cover" ? Math.max(W / sw, H / sh) : Math.min(W / sw, H / sh);
+    dw = sw * base;
+    dh = sh * base;
+  }
+  const tr = clip.transform;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, tr.opacity));
+  ctx.translate(W / 2 + tr.x * W, H / 2 + tr.y * H);
+  ctx.rotate((tr.rotation * Math.PI) / 180);
+  ctx.scale(tr.scale, tr.scale);
+  ctx.drawImage(src, -dw / 2, -dh / 2, dw, dh);
+  ctx.restore();
 }
 
 /** Draw the composition at time `t` (ms) into ctx, sized to comp.width×height. */
@@ -162,9 +179,9 @@ export function drawFrame(
 
   if (m.kind === "video") {
     const v = getVideo(m.src);
-    if (v.readyState >= 2) contain(ctx, W, H, v, v.videoWidth, v.videoHeight);
+    if (v.readyState >= 2) drawSource(ctx, comp, v, v.videoWidth, v.videoHeight, clip);
   } else {
     const img = getImage(m.src);
-    if (img.complete && img.naturalWidth) contain(ctx, W, H, img, img.naturalWidth, img.naturalHeight);
+    if (img.complete && img.naturalWidth) drawSource(ctx, comp, img, img.naturalWidth, img.naturalHeight, clip);
   }
 }

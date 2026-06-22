@@ -4,6 +4,34 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — Day 1 (later 5): editable MVP — engine + inspector + reorder + save/open
+**Done**
+- **Compositing engine** (`composite.ts`) now applies per-clip **fit mode** (contain/cover/fill) +
+  **transform** — scale, position X/Y, rotation, opacity — all stored as fractions of the comp, so an
+  edit looks identical in the preview and in the ffmpeg export at any resolution (720p–8K). Video clips
+  gained a **trim start** (source in-point) honoured in both preview seek and export.
+- **Inspector panel** (right of the monitor): Composition (background colour, frame rate) + the selected
+  clip's properties (fit buttons, scale/X/Y/rotation/opacity sliders, reset-transform, duration, video
+  trim, remove). Live two-way bound to the store.
+- **Timeline**: clips are now **drag-to-reorder** (cross-midpoint swap) on top of select / scrub /
+  drag-resize / remove; selected clip is highlighted.
+- **Editing keyboard shortcuts** (Edit window): Space play/pause, ←/→ step a frame (⇧ = 10), Delete
+  removes the selected clip.
+- **Project save/open now round-trips the whole edit**: `serialize.ts` writes comp + clips + media
+  (referenced by absolute **path**, not bytes) + audio into the .json; on open the files are re-read
+  from disk and rebuilt as blob URLs. Old clips missing new fields are migrated with defaults.
+- Milestones reached: **M2 (engine+monitor) ✅, M4 (inspector) ✅, M5 (project I/O) ✅**.
+
+**Next**
+- M8: animated backgrounds / code-layers (keyframed web content) · audio polish (mux video audio +
+  Web Audio preview) · M9 autosave + packaging.
+
+**Blocked**
+- None. (Saved projects reference media by file path — moving/deleting a source file breaks reload; an
+  "embed media" option is a later choice.)
+
+---
+
 ## 2026-06-22 — Day 1 (later 4): drag & drop + video support (import → preview → export)
 **Done**
 - **Drag & drop** onto Media bin (images/video/audio) — dashed-highlight drop zone + result note; global drop guard

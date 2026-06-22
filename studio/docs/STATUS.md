@@ -2,7 +2,7 @@
 
 Updated: 2026-06-22 · Legend: ✅ done · 🔨 in progress · ❌ not started
 
-## Current milestone: **MVP loop done → M2 (scene engine) next**
+## Current milestone: **Editable MVP done (engine+monitor+inspector+timeline+save) → M8 (animated backgrounds) next**
 
 The first end-to-end vertical slice works: **import images → arrange on timeline → preview → export MP4 (native ffmpeg)** at 720p/1080p/4K/8K, optional audio muxed in.
 
@@ -13,10 +13,10 @@ The first end-to-end vertical slice works: **import images → arrange on timeli
 | Command registry | ✅ | `commands/` — registry + keymap |
 | Electron + Vite + React shell (boots) | ✅ | `npm run dev` works |
 | **M1 — Menu bar** | ✅ | command-driven; items light up per milestone |
-| M2 — Engine + Monitor | 🔨 | Preview Monitor (canvas + play/scrub) ✅ · scene/animate engine port ❌ |
-| M3 — Timeline | ✅ | basic: image clips, scrub, drag-resize duration, playhead (reorder = later) |
-| M4 — Inspector | ❌ | port |
-| M5 — Project I/O | 🔨 | save/open .json works · timeline not serialized into doc yet |
+| M2 — Engine + Monitor | ✅ | compositing engine (fit + transform: scale/pos/rotate/opacity, res-independent) + Monitor (play/scrub/step) · keyframed scene layers → M8 |
+| M3 — Timeline | ✅ | image/video clips, scrub, drag-resize duration, **drag-reorder**, select, playhead |
+| M4 — Inspector | ✅ | comp (bg/fps) + clip props (fit, scale, X/Y, rotation, opacity, duration, video trim, remove) |
+| M5 — Project I/O | ✅ | save/open .json serializes full editor (comp+media-by-path+clips+audio); media re-read on open · autosave → M9 |
 | M6 — Export (native ffmpeg) | ✅ | canvas frames → ffmpeg H.264 mp4, 720p–8K + audio mux |
 | M7 — Media + Audio | 🔨 | image/**video**/audio import (buttons + drag&drop) ✅ · video plays in preview + renders in export ✅ · video's own audio + Web Audio preview = later |
 | M8 — Backgrounds + Code layers | ❌ | port |
@@ -38,8 +38,13 @@ Currently the menu bar has **File** only (New/Open/Import Image/Import Audio/Sav
 ## Reference
 `research/video-editor/app/` = previous working build. Port proven modules from there.
 
+## Editing shortcuts (Edit window)
+Space = play/pause · ←/→ = step 1 frame (⇧ = 10) · Delete/Backspace = remove selected clip.
+
 ## Right now
-End-to-end MVP loop is live (import → timeline → preview → export). Export uses the
-canvas-frame → ffmpeg path (robust to mixed image sizes).
-Next: **M2 — port the scene engine** (types/animate/SceneRenderer/codeLayer) so layers can be
-animated web content, not just image stills; then Inspector (M4) + project-doc serialization (M5).
+Imported media is fully **editable + saveable + exportable**: drag-reorder/resize clips on the
+timeline, tune each clip in the Inspector (fit, scale, position, rotation, opacity, duration, video
+trim), set comp bg/fps; every transform is resolution-independent so it renders identically in the
+ffmpeg export at 720p–8K. Projects save/open with the whole timeline (media referenced by file path).
+Next: **M8 — animated backgrounds / code-layers** (keyframed web content, not just stills), then
+audio polish (mux video's own audio, Web Audio preview) + M9 packaging/autosave.

@@ -15,12 +15,27 @@ export interface MediaItem {
 
 export type NewMedia = Omit<MediaItem, "id">;
 
+export type FitMode = "contain" | "cover" | "fill";
+
+// Resolution-independent transform: positions/scale are relative to the comp,
+// so the same edit looks identical at 1080p or 8K.
+export interface Transform {
+  x: number; // horizontal offset as a fraction of comp width (0 = centered)
+  y: number; // vertical offset as a fraction of comp height
+  scale: number; // 1 = base fit
+  rotation: number; // degrees
+  opacity: number; // 0..1
+}
+
 // One clip on the single visual track. Times are in milliseconds.
 export interface Clip {
   id: string;
   mediaId: string;
   start: number;
   duration: number;
+  trimStart: number; // ms into the source media where playback begins (video)
+  fit: FitMode;
+  transform: Transform;
 }
 
 export interface Composition {
@@ -30,6 +45,7 @@ export interface Composition {
   bg: string;
 }
 
+export const DEFAULT_TRANSFORM: Transform = { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 };
 const DEFAULT_CLIP_MS = 3000;
 const MIN_CLIP_MS = 200;
 
@@ -56,13 +72,19 @@ interface EditorState {
   removeMedia: (id: string) => void;
   addClip: (mediaId: string) => void;
   removeClip: (id: string) => void;
+  moveClip: (id: string, toIndex: number) => void;
   selectClip: (id: string | null) => void;
   setClipDuration: (id: string, ms: number) => void;
+  updateClip: (id: string, partial: Partial<Clip>) => void;
+  updateTransform: (id: string, partial: Partial<Transform>) => void;
   setAudio: (item: NewMedia | null) => void;
+  updateComp: (partial: Partial<Composition>) => void;
   setPlayhead: (ms: number) => void;
   play: () => void;
   pause: () => void;
   togglePlay: () => void;
+  stepFrame: (dir: number) => void;
+  replaceAll: (s: Partial<EditorState>) => void;
   reset: () => void;
   duration: () => number;
 }
@@ -108,7 +130,15 @@ export const useEditor = create<EditorState>((set, get) => ({
     set((s) => {
       const m = s.media.find((x) => x.id === mediaId);
       const duration = m?.kind === "video" && m.duration ? m.duration : DEFAULT_CLIP_MS;
-      const clip: Clip = { id: uid(), mediaId, start: 0, duration };
+      const clip: Clip = {
+        id: uid(),
+        mediaId,
+        start: 0,
+        duration,
+        trimStart: 0,
+        fit: "contain",
+        transform: { ...DEFAULT_TRANSFORM },
+      };
       return { clips: relayout([...s.clips, clip]), selectedClipId: clip.id };
     }),
 
@@ -117,6 +147,16 @@ export const useEditor = create<EditorState>((set, get) => ({
       clips: relayout(s.clips.filter((c) => c.id !== id)),
       selectedClipId: s.selectedClipId === id ? null : s.selectedClipId,
     })),
+
+  moveClip: (id, toIndex) =>
+    set((s) => {
+      const arr = [...s.clips];
+      const from = arr.findIndex((c) => c.id === id);
+      if (from < 0) return {};
+      const [it] = arr.splice(from, 1);
+      arr.splice(Math.max(0, Math.min(toIndex, arr.length)), 0, it);
+      return { clips: relayout(arr) };
+    }),
 
   selectClip: (id) => set({ selectedClipId: id }),
 
@@ -129,11 +169,26 @@ export const useEditor = create<EditorState>((set, get) => ({
       ),
     })),
 
+  updateClip: (id, partial) =>
+    set((s) => {
+      const clips = s.clips.map((c) => (c.id === id ? { ...c, ...partial } : c));
+      return { clips: "duration" in partial ? relayout(clips) : clips };
+    }),
+
+  updateTransform: (id, partial) =>
+    set((s) => ({
+      clips: s.clips.map((c) =>
+        c.id === id ? { ...c, transform: { ...c.transform, ...partial } } : c,
+      ),
+    })),
+
   setAudio: (item) =>
     set((s) => {
       revoke(s.audio);
       return { audio: item ? { ...item, id: uid() } : null };
     }),
+
+  updateComp: (partial) => set((s) => ({ comp: { ...s.comp, ...partial } })),
 
   setPlayhead: (ms) => set({ playhead: Math.max(0, Math.min(ms, get().duration())) }),
 
@@ -144,6 +199,14 @@ export const useEditor = create<EditorState>((set, get) => ({
   },
   pause: () => set({ playing: false }),
   togglePlay: () => (get().playing ? get().pause() : get().play()),
+
+  stepFrame: (dir) => {
+    const { comp, playhead } = get();
+    get().pause();
+    get().setPlayhead(playhead + (dir * 1000) / comp.fps);
+  },
+
+  replaceAll: (next) => set(next as Partial<EditorState>),
 
   reset: () =>
     set((s) => {

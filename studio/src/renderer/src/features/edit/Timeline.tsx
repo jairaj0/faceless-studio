@@ -39,6 +39,35 @@ export function Timeline() {
     window.addEventListener("pointerup", up);
   };
 
+  // Pointer-down on a clip: select immediately. A small drag reorders it among
+  // the other clips; a plain click (no drag) scrubs the playhead to its start.
+  const startClipDrag = (e: React.PointerEvent, id: string, clipStart: number): void => {
+    e.stopPropagation();
+    selectClip(id);
+    const startX = e.clientX;
+    let dragging = false;
+    const move = (ev: PointerEvent): void => {
+      if (!dragging && Math.abs(ev.clientX - startX) < 5) return;
+      dragging = true;
+      const el = laneRef.current;
+      if (!el) return;
+      const ms = (ev.clientX - el.getBoundingClientRect().left + el.scrollLeft) / PX_PER_MS;
+      const cur = useEditor.getState().clips;
+      let idx = 0;
+      for (const o of cur) {
+        if (o.id !== id && ms > o.start + o.duration / 2) idx++;
+      }
+      if (idx !== cur.findIndex((x) => x.id === id)) useEditor.getState().moveClip(id, idx);
+    };
+    const up = (): void => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      if (!dragging) setPlayhead(clipStart);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
   const contentW = Math.max(800, duration * PX_PER_MS + 200);
 
   return (
@@ -92,7 +121,7 @@ export function Timeline() {
           >
             {clips.length === 0 && (
               <p style={{ padding: "20px 12px", fontSize: 11, color: "var(--fg-3)" }}>
-                Double-click an image in the Media panel to add it here.
+                Double-click media in the Media panel to add it here. Drag clips to reorder.
               </p>
             )}
             {clips.map((c) => {
@@ -101,11 +130,7 @@ export function Timeline() {
               return (
                 <div
                   key={c.id}
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                    selectClip(c.id);
-                    setPlayhead(c.start);
-                  }}
+                  onPointerDown={(e) => startClipDrag(e, c.id, c.start)}
                   style={{
                     position: "absolute",
                     left: c.start * PX_PER_MS,
@@ -116,8 +141,10 @@ export function Timeline() {
                     background:
                       m?.kind === "image" ? `center/cover url(${m.src})` : "var(--bg-2)",
                     border: `2px solid ${active ? "var(--accent)" : "var(--border)"}`,
-                    cursor: "pointer",
-                    boxShadow: "inset 0 0 0 100px rgba(0,0,0,0.35)",
+                    cursor: "grab",
+                    boxShadow: active
+                      ? "inset 0 0 0 100px rgba(0,0,0,0.2)"
+                      : "inset 0 0 0 100px rgba(0,0,0,0.35)",
                   }}
                 >
                   <div
