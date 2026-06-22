@@ -1,5 +1,5 @@
-import type { Clip, Composition, MediaItem } from "../../store/editor";
-import { TF_DEFAULT } from "../../store/editor";
+import type { Clip, Composition, MediaItem, Track } from "../../store/editor";
+import { allClips, TF_DEFAULT } from "../../store/editor";
 import { evalProp } from "./animate";
 
 // Decoded media cached by src URL. Both preview and export draw through here so
@@ -30,10 +30,10 @@ export function getVideo(src: string): HTMLVideoElement {
   return v;
 }
 
-/** Pause every cached video except (optionally) the one playing now. */
-export function pauseVideos(exceptSrc?: string): void {
+/** Pause every cached video except the ones whose src is in `keep`. */
+export function pauseVideos(keep?: Set<string>): void {
   vidCache.forEach((v, src) => {
-    if (src !== exceptSrc && !v.paused) v.pause();
+    if (!(keep && keep.has(src)) && !v.paused) v.pause();
   });
 }
 
@@ -83,12 +83,29 @@ function seek(v: HTMLVideoElement, sec: number): Promise<void> {
   });
 }
 
+/** The clip a single track shows at time `t` (latest-starting match wins). */
 export function clipAt(clips: Clip[], t: number): Clip | null {
+  let best: Clip | null = null;
   for (const c of clips) {
-    if (t >= c.start && t < c.start + c.duration) return c;
+    if (t >= c.start && t <= c.start + c.duration && (!best || c.start > best.start)) best = c;
   }
-  // At/after the end, hold the last clip so the final frame isn't blank.
-  return clips.length ? clips[clips.length - 1] : null;
+  return best;
+}
+
+/** Which tracks are visible at all (solo overrides; hidden never shows). */
+export function visibleTracks(tracks: Track[]): Track[] {
+  const soloed = tracks.some((t) => t.solo);
+  return tracks.filter((t) => !t.hidden && (!soloed || t.solo));
+}
+
+/** The clips to composite at time `t`, bottom track first → top track last. */
+export function visibleClipsAt(tracks: Track[], t: number): Clip[] {
+  const out: Clip[] = [];
+  for (const tr of visibleTracks(tracks)) {
+    const c = clipAt(tr.clips, t);
+    if (c) out.push(c);
+  }
+  return out;
 }
 
 /** Local time within a clip's source media, in seconds, clamped to its length. */
@@ -98,10 +115,10 @@ export function localTime(clip: Clip, m: MediaItem, t: number): number {
   return Math.max(0, Math.min(sec, max));
 }
 
-/** Preload every image/video used by the clips so the first draw isn't blank. */
-export async function preloadClips(clips: Clip[], media: MediaItem[]): Promise<void> {
+/** Preload every image/video used by the tracks so the first draw isn't blank. */
+export async function preloadClips(tracks: Track[], media: MediaItem[]): Promise<void> {
   const items = new Map<string, MediaItem>();
-  for (const c of clips) {
+  for (const c of allClips(tracks)) {
     const m = media.find((x) => x.id === c.mediaId);
     if (m) items.set(m.src, m);
   }
@@ -119,15 +136,17 @@ export async function preloadClips(clips: Clip[], media: MediaItem[]): Promise<v
   );
 }
 
-/** Export: make the active video clip show the correct frame before drawing. */
-export async function prepareFrame(media: MediaItem[], clips: Clip[], t: number): Promise<void> {
-  const clip = clipAt(clips, t);
-  if (!clip) return;
-  const m = media.find((x) => x.id === clip.mediaId);
-  if (!m || m.kind !== "video") return;
-  const v = getVideo(m.src);
-  await ready(v);
-  await seek(v, localTime(clip, m, t));
+/** Export: seek every visible video clip to its correct frame before drawing. */
+export async function prepareFrame(media: MediaItem[], tracks: Track[], t: number): Promise<void> {
+  await Promise.all(
+    visibleClipsAt(tracks, t).map(async (clip) => {
+      const m = media.find((x) => x.id === clip.mediaId);
+      if (!m || m.kind !== "video") return;
+      const v = getVideo(m.src);
+      await ready(v);
+      await seek(v, localTime(clip, m, t));
+    }),
+  );
 }
 
 // Draw a source with the clip's fit mode + a resolved transform. Positions/scale
@@ -170,24 +189,17 @@ function drawSource(
   ctx.restore();
 }
 
-/** Draw the composition at time `t` (ms) into ctx, sized to comp.width×height. */
-export function drawFrame(
+/** Draw one clip (resolving its source) at the given absolute time. */
+function drawClip(
   ctx: CanvasRenderingContext2D,
   comp: Composition,
   media: MediaItem[],
-  clips: Clip[],
+  clip: Clip,
   t: number,
 ): void {
-  const { width: W, height: H } = comp;
-  ctx.fillStyle = comp.bg;
-  ctx.fillRect(0, 0, W, H);
-
-  const clip = clipAt(clips, t);
-  if (!clip) return;
   const m = media.find((x) => x.id === clip.mediaId);
   if (!m) return;
   const localT = t - clip.start;
-
   if (m.kind === "video") {
     const v = getVideo(m.src);
     if (v.readyState >= 2) drawSource(ctx, comp, v, v.videoWidth, v.videoHeight, clip, localT);
@@ -196,4 +208,18 @@ export function drawFrame(
     if (img.complete && img.naturalWidth)
       drawSource(ctx, comp, img, img.naturalWidth, img.naturalHeight, clip, localT);
   }
+}
+
+/** Draw the composition at time `t` (ms) into ctx, sized to comp.width×height. */
+export function drawFrame(
+  ctx: CanvasRenderingContext2D,
+  comp: Composition,
+  media: MediaItem[],
+  tracks: Track[],
+  t: number,
+): void {
+  const { width: W, height: H } = comp;
+  ctx.fillStyle = comp.bg;
+  ctx.fillRect(0, 0, W, H);
+  for (const clip of visibleClipsAt(tracks, t)) drawClip(ctx, comp, media, clip, t);
 }

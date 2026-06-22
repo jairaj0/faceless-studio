@@ -4,6 +4,32 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — Multi-track Stage 1 (Premiere-style N tracks)
+**Done — rebuilt the document model from single-track → N free-positioned tracks** (after studying
+OpenReel's `Track[]` model; kept studio's canvas-render engine untouched per constraint "engine nhi badalna"):
+- **Model** (`store/editor.ts`): `tracks: Track[]`, each `Track { clips: Clip[]; hidden; locked; solo }`.
+  Clips carry an absolute `start` (gaps allowed). Helpers `allClips`, `findClip`, `locate`. New actions:
+  `addTrack`/`removeTrack`/`toggleTrack`, `placeClip(id, trackId, start)` (atomic move across + within
+  tracks), `setClipStart`, plus split/duplicate/keyframes reworked over the track model. Undo snapshots
+  now `{tracks, comp}`. v2 single-track saves migrate into one V1 track with recomputed absolute starts.
+- **Compositing** (`composite.ts`): `visibleTracks` (solo overrides, hidden excluded), `visibleClipsAt`
+  (bottom→top), `clipAt` (latest-starting wins, no "hold last clip"), `prepareFrame` seeks **all** visible
+  videos. `drawFrame` paints bottom track → top.
+- **Master-clock playback** (`PreviewMonitor.tsx`): playhead advances by real dt; every visible video is
+  seeked/nudged (re-seek if drift > 0.3s) → supports **multiple simultaneous videos (PiP across tracks)**.
+  Replaces the old "video drives the playhead" hack.
+- **Timeline rewrite** (`Timeline.tsx`): N lanes (top track on top), sticky track headers with
+  👁 hide / 🔒 lock / ◉ solo / ✕ remove + **+Track**, px-based zoom + horizontal scroll, clips positioned
+  by absolute start, **horizontal drag = retime / vertical drag = move between tracks** (`placeClip`),
+  both-edge trim, keyframe diamonds, razor/split, snapping, context menu, read-only audio lane, playhead
+  spanning all lanes. EditWindow split-shortcut + Home/End added.
+- Export (`ExportWindow.tsx`) + serialize updated for tracks. typecheck + build green; dev boots clean.
+
+**Next:** Stage 2 — text / caption layers (new clip type `text`, render in composite, Inspector controls,
+"Add Text" button). Then Stage 3 color/filters, Stage 4 transitions, Stage 5 audio waveform+volume+fades.
+
+---
+
 ## 2026-06-22 — Day 1 (later 6): keyframes + pro timeline tools (ported from reference)
 **Done — ported the *working* parts of `research/video-editor/app` into studio's clip model:**
 - **Animation engine** (`features/edit/animate.ts`): `evalProp` + 6 easings (linear/easeIn/Out/InOut/

@@ -4,6 +4,7 @@ import {
   type Clip,
   type Composition,
   type MediaItem,
+  type Track,
 } from "../../store/editor";
 import type { MediaKind } from "../../../../shared/media";
 
@@ -21,7 +22,8 @@ interface SerializedMedia {
 export interface ProjectEditor {
   comp: Composition;
   media: SerializedMedia[];
-  clips: Clip[];
+  tracks?: Track[]; // v3: multi-track
+  clips?: Clip[]; // v2: single track (migrated on open)
   audio: SerializedMedia | null;
 }
 
@@ -38,7 +40,7 @@ export function serializeEditor(): ProjectEditor {
   return {
     comp: s.comp,
     media: s.media.map(strip),
-    clips: s.clips,
+    tracks: s.tracks,
     audio: s.audio ? strip(s.audio) : null,
   };
 }
@@ -51,10 +53,40 @@ async function loadSrc(path: string): Promise<string> {
 // Fill in fields that older saves may not have, so clips stay valid.
 const migrateClip = (c: Clip): Clip => ({
   ...c,
+  type: c.type ?? "media",
   trimStart: c.trimStart ?? 0,
   fit: c.fit ?? "contain",
   transform: c.transform ?? { ...DEFAULT_TRANSFORM },
 });
+
+const newId = (): string =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+
+// Build the track list from either v3 (tracks) or v2 (single gapless clips).
+function migrateTracks(d: ProjectEditor, ids: Set<string>): Track[] {
+  const keep = (c: Clip): boolean => ids.has(c.mediaId);
+  if (d.tracks?.length) {
+    return d.tracks.map((t) => ({
+      id: t.id ?? newId(),
+      name: t.name ?? "V1",
+      kind: "video",
+      hidden: !!t.hidden,
+      locked: !!t.locked,
+      solo: !!t.solo,
+      clips: (t.clips ?? []).map(migrateClip).filter(keep),
+    }));
+  }
+  // v2: wrap the old single gapless track, recomputing absolute starts.
+  let t = 0;
+  const clips = (d.clips ?? []).map(migrateClip).filter(keep).map((c) => {
+    const start = t;
+    t += c.duration;
+    return { ...c, start };
+  });
+  return [{ id: newId(), name: "V1", kind: "video", hidden: false, locked: false, solo: false, clips }];
+}
 
 export async function hydrateEditor(d: ProjectEditor): Promise<void> {
   const media: MediaItem[] = [];
@@ -73,7 +105,7 @@ export async function hydrateEditor(d: ProjectEditor): Promise<void> {
   st.replaceAll({
     comp: d.comp,
     media,
-    clips: (d.clips ?? []).map(migrateClip).filter((c) => ids.has(c.mediaId)),
+    tracks: migrateTracks(d, ids),
     audio,
     playhead: 0,
     playing: false,

@@ -2,9 +2,17 @@
 
 Updated: 2026-06-22 · Legend: ✅ done · 🔨 in progress · ❌ not started
 
-## Current milestone: **Editable MVP done (engine+monitor+inspector+timeline+save) → M8 (animated backgrounds) next**
+## Current milestone: **Multi-track core done (Stage 1) → Stage 2 (text layers) next**
 
-The first end-to-end vertical slice works: **import images → arrange on timeline → preview → export MP4 (native ffmpeg)** at 720p/1080p/4K/8K, optional audio muxed in.
+The first end-to-end vertical slice works: **import images/video → arrange on N timeline tracks → preview → export MP4 (native ffmpeg)** at 720p/1080p/4K/8K, optional audio muxed in.
+
+### Multi-track upgrade (5-stage plan, from OpenReel feature study)
+Premiere-style N tracks: each track has free-positioned clips (gaps allowed); higher track composites on top; per-track hide 👁 / lock 🔒 / solo ◉ / remove. Playback uses a **master clock** (playhead drives time; every visible video is seeked/nudged to stay in sync → multiple simultaneous videos / PiP).
+- **Stage 1 — multi-track core** ✅ tracks model, compositing bottom→top, vertical+horizontal clip drag, add/remove track, per-track controls, master-clock playback, v2→v3 save migration.
+- Stage 2 — Text / caption layers ❌
+- Stage 3 — Color / filters (per-clip + presets) ❌
+- Stage 4 — Transitions (cross-fade / wipe / slide) ❌
+- Stage 5 — Audio waveform + volume + fades (audio → track clips) ❌
 
 | Area | State | Notes |
 |---|---|---|
@@ -14,7 +22,7 @@ The first end-to-end vertical slice works: **import images → arrange on timeli
 | Electron + Vite + React shell (boots) | ✅ | `npm run dev` works |
 | **M1 — Menu bar** | ✅ | command-driven; items light up per milestone |
 | M2 — Engine + Monitor | ✅ | compositing + **keyframe animation engine** (evalProp + 6 easings, res-independent) + Monitor (play/scrub/step) · scene/code layers → M8 |
-| M3 — Timeline | ✅ | clips: scrub, trim, reorder, **razor/split, snapping, zoom, keyframe diamonds, context menu**, playhead |
+| M3 — Timeline | ✅ | **N tracks** (lanes): scrub, trim both edges, **vertical drag between tracks**, **razor/split, snapping, zoom, keyframe diamonds, context menu**, per-track 👁🔒◉/remove, +Track, playhead spanning lanes |
 | M4 — Inspector | ✅ | comp (bg/fps) + clip transform with **keyframes (◆) + easing + motion presets** + fit, duration, video trim |
 | M5 — Project I/O | ✅ | save/open .json serializes full editor (comp+media-by-path+clips+audio); media re-read on open · autosave → M9 |
 | M6 — Export (native ffmpeg) | ✅ | canvas frames → ffmpeg H.264 mp4, 720p–8K + audio mux |
@@ -40,7 +48,8 @@ Currently the menu bar has **File** only (New/Open/Import Image/Import Audio/Sav
 
 ## Editing shortcuts (Edit window)
 Space play/pause · ←/→ step 1 frame (⇧ = 10) · S split at playhead · ⌘D duplicate · ⌘Z / ⇧⌘Z undo/redo
-· Delete/Backspace remove selected clip. Timeline tools: ⬚ select · ✂ razor · 🧲 snap · −/Fit/+ zoom.
+· Home/End jump to start/end · Delete/Backspace remove selected clip.
+Timeline tools: ⬚ select · ✂ razor · 🧲 snap · −/1×/+ zoom · +Track. Drag a clip up/down to move it between tracks.
 
 ## Right now
 Imported media is fully **editable + saveable + exportable**: drag-reorder/resize clips on the

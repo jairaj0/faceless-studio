@@ -1,6 +1,7 @@
 import {
   useEditor,
   evalTransform,
+  findClip,
   type FitMode,
   type TransformKey,
 } from "../../store/editor";
@@ -29,7 +30,7 @@ const PRESETS = [
 ];
 
 export function Inspector() {
-  const clips = useEditor((s) => s.clips);
+  const tracks = useEditor((s) => s.tracks);
   const media = useEditor((s) => s.media);
   const comp = useEditor((s) => s.comp);
   const playhead = useEditor((s) => s.playhead);
@@ -47,7 +48,7 @@ export function Inspector() {
   const selectKeyframe = useEditor((s) => s.selectKeyframe);
   const pushHistory = useEditor((s) => s.pushHistory);
 
-  const clip = clips.find((c) => c.id === selectedId) ?? null;
+  const clip = findClip(tracks, selectedId);
   const m = clip ? media.find((x) => x.id === clip.mediaId) : null;
   const isVideo = m?.kind === "video";
 

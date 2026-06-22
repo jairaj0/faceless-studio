@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useEditor } from "../../store/editor";
+import { useEditor, allClips } from "../../store/editor";
 import { drawFrame, prepareFrame, preloadClips, pauseVideos } from "../edit/composite";
 import { fmtTime } from "../edit/PreviewMonitor";
 import type { ExportProgress, ExportResult } from "../../../../shared/export";
@@ -15,7 +15,7 @@ const PRESETS = [
 
 export function ExportWindow() {
   const media = useEditor((s) => s.media);
-  const clips = useEditor((s) => s.clips);
+  const tracks = useEditor((s) => s.tracks);
   const comp = useEditor((s) => s.comp);
   const audio = useEditor((s) => s.audio);
   const duration = useEditor((s) => s.duration());
@@ -25,6 +25,7 @@ export function ExportWindow() {
   const [prog, setProg] = useState<ExportProgress | null>(null);
   const [result, setResult] = useState<ExportResult | null>(null);
 
+  const clips = allClips(tracks);
   const ar = comp.width / comp.height;
   const W = Math.round((presetH * ar) / 2) * 2; // keep even for yuv420p
   const H = presetH;
@@ -41,7 +42,7 @@ export function ExportWindow() {
     setProg({ phase: "capture", pct: 0, frame: 0, total });
     const stop = window.api.export.onProgress(setProg);
     try {
-      await preloadClips(clips, media);
+      await preloadClips(tracks, media);
       await window.api.export.begin();
 
       const cv = document.createElement("canvas");
@@ -53,8 +54,8 @@ export function ExportWindow() {
 
       for (let i = 0; i < total; i++) {
         const t = (i / comp.fps) * 1000;
-        await prepareFrame(media, clips, t); // seek active video to this frame
-        drawFrame(ctx, frameComp, media, clips, t);
+        await prepareFrame(media, tracks, t); // seek visible videos to this frame
+        drawFrame(ctx, frameComp, media, tracks, t);
         await window.api.export.frame(i, cv.toDataURL("image/png"));
         setProg({ phase: "capture", pct: Math.round(((i + 1) / total) * 90), frame: i + 1, total });
       }

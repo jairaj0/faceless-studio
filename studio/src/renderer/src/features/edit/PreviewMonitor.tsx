@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useEditor } from "../../store/editor";
-import { drawFrame, getImage, getVideo, clipAt, localTime, pauseVideos } from "./composite";
+import { drawFrame, getImage, getVideo, localTime, pauseVideos, visibleClipsAt } from "./composite";
 
 export function fmtTime(ms: number): string {
   const s = Math.max(0, ms) / 1000;
@@ -12,91 +12,77 @@ export function fmtTime(ms: number): string {
 export function PreviewMonitor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const media = useEditor((s) => s.media);
-  const clips = useEditor((s) => s.clips);
+  const tracks = useEditor((s) => s.tracks);
   const comp = useEditor((s) => s.comp);
   const playhead = useEditor((s) => s.playhead);
   const playing = useEditor((s) => s.playing);
   const duration = useEditor((s) => s.duration());
   const togglePlay = useEditor((s) => s.togglePlay);
+  const hasClips = tracks.some((t) => t.clips.length > 0);
 
   // Draw the current frame whenever anything visible changes.
   useEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
-    drawFrame(ctx, comp, media, clips, playhead);
+    drawFrame(ctx, comp, media, tracks, playhead);
 
-    // If the active image hasn't decoded yet, redraw once it loads.
-    const clip = clipAt(clips, playhead);
-    const m = clip && media.find((x) => x.id === clip.mediaId);
-    if (m && m.kind === "image") {
+    // If any visible image hasn't decoded yet, redraw once it loads.
+    for (const clip of visibleClipsAt(tracks, playhead)) {
+      const m = media.find((x) => x.id === clip.mediaId);
+      if (m?.kind !== "image") continue;
       const img = getImage(m.src);
-      if (!img.complete || !img.naturalWidth) {
-        img.onload = () => drawFrame(ctx, comp, media, clips, playhead);
-      }
+      if (!img.complete || !img.naturalWidth)
+        img.onload = () => drawFrame(ctx, comp, media, tracks, playhead);
     }
-  }, [comp, media, clips, playhead]);
+  }, [comp, media, tracks, playhead]);
 
-  // While paused, keep the active video parked on the exact frame under the playhead.
+  // While paused, park every visible video on the exact frame under the playhead.
   useEffect(() => {
     if (playing) return;
-    const clip = clipAt(clips, playhead);
-    const m = clip && media.find((x) => x.id === clip.mediaId);
-    if (!clip || m?.kind !== "video") return;
-    const v = getVideo(m.src);
-    v.pause();
-    const target = localTime(clip, m, playhead);
-    if (Math.abs(v.currentTime - target) > 0.02) {
-      const ctx = canvasRef.current?.getContext("2d");
-      const on = (): void => {
-        v.removeEventListener("seeked", on);
-        if (ctx) drawFrame(ctx, comp, media, clips, playhead);
-      };
-      v.addEventListener("seeked", on);
-      v.currentTime = target;
+    const ctx = canvasRef.current?.getContext("2d");
+    for (const clip of visibleClipsAt(tracks, playhead)) {
+      const m = media.find((x) => x.id === clip.mediaId);
+      if (m?.kind !== "video") continue;
+      const v = getVideo(m.src);
+      v.pause();
+      const target = localTime(clip, m, playhead);
+      if (Math.abs(v.currentTime - target) > 0.04) {
+        const on = (): void => {
+          v.removeEventListener("seeked", on);
+          if (ctx) drawFrame(ctx, comp, media, tracks, playhead);
+        };
+        v.addEventListener("seeked", on);
+        v.currentTime = target;
+      }
     }
-  }, [playing, playhead, clips, media, comp]);
+  }, [playing, playhead, tracks, media, comp]);
 
-  // Playback clock. Video clips drive the playhead natively; images advance by dt.
+  // Playback clock. The playhead is the master clock (advances by real time);
+  // every visible video is nudged/seeked to stay in sync with it. This supports
+  // multiple simultaneous videos (picture-in-picture across tracks).
   useEffect(() => {
     if (!playing) return;
     let raf = 0;
     let last = performance.now();
-    // Which clip is currently driving native video playback. We seek + play ONCE
-    // on entering a video clip, then just read its time — never re-seek every frame
-    // (that races with the async play() and freezes the video, so it never advances
-    // to the next clip).
-    let activeClip: string | null = null;
     const step = (now: number): void => {
       const dt = now - last;
       last = now;
       const st = useEditor.getState();
-      const ph = st.playhead;
       const total = st.duration();
-      const clip = clipAt(st.clips, ph);
-      const m = clip && st.media.find((x) => x.id === clip.mediaId);
+      const next = st.playhead + dt;
 
-      let next = ph + dt;
-      if (clip && m?.kind === "video") {
+      // Sync videos to the playhead.
+      const keep = new Set<string>();
+      for (const clip of visibleClipsAt(st.tracks, next)) {
+        const m = st.media.find((x) => x.id === clip.mediaId);
+        if (m?.kind !== "video") continue;
+        keep.add(m.src);
         const v = getVideo(m.src);
-        if (activeClip !== clip.id) {
-          // Entering this video clip: stop other videos, seek to the in-point once, play once.
-          pauseVideos(m.src);
-          activeClip = clip.id;
-          v.currentTime = localTime(clip, m, ph);
-          void v.play();
-        }
-        // Elapsed time inside this clip = video time minus its trim in-point.
-        const elapsed = v.currentTime * 1000 - clip.trimStart;
-        if (v.ended || elapsed >= clip.duration - 1) {
-          next = clip.start + clip.duration; // hand off to the next clip (image or video)
-          activeClip = null;
-        } else {
-          next = clip.start + Math.max(0, elapsed);
-        }
-      } else {
-        if (activeClip) pauseVideos();
-        activeClip = null;
+        const target = localTime(clip, m, next);
+        if (Math.abs(v.currentTime - target) > 0.3) v.currentTime = target; // re-sync on drift
+        if (v.paused) void v.play();
       }
+      pauseVideos(keep); // pause anything no longer on screen
 
       if (next >= total) {
         st.setPlayhead(total);
@@ -135,7 +121,7 @@ export function PreviewMonitor() {
           background: "#0d0d0d",
         }}
       >
-        {clips.length === 0 ? (
+        {!hasClips ? (
           <p style={{ color: "var(--fg-3)", fontSize: 12 }}>
             Add media to the timeline to see a preview.
           </p>

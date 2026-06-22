@@ -29,7 +29,7 @@ export const TF_DEFAULT: Record<TransformKey, number> = {
 };
 
 // Resolution-independent transform. Each field is a constant OR a list of
-// keyframes (clip-local ms), so an animation survives reorder/resize.
+// keyframes (clip-local ms), so an animation survives reorder/resize/split.
 export interface Transform {
   x?: Prop; // horizontal offset as a fraction of comp width (0 = centered)
   y?: Prop; // vertical offset as a fraction of comp height
@@ -38,15 +38,30 @@ export interface Transform {
   opacity?: Prop; // 0..1
 }
 
-// One clip on the single visual track. Times are in milliseconds.
+export type ClipType = "media";
+
+// One clip living inside a track. Times are in milliseconds. Clips are
+// free-positioned on the timeline now (explicit `start`, gaps allowed).
 export interface Clip {
   id: string;
+  type: ClipType;
   mediaId: string;
-  start: number;
+  start: number; // absolute timeline ms
   duration: number;
   trimStart: number; // ms into the source media where playback begins (video)
   fit: FitMode;
   transform: Transform;
+}
+
+// A horizontal lane. Tracks composite bottom (index 0) → top (last).
+export interface Track {
+  id: string;
+  name: string;
+  kind: "video"; // visual track; audio stays a singleton until Stage 5
+  clips: Clip[];
+  hidden: boolean;
+  locked: boolean;
+  solo: boolean;
 }
 
 export interface Composition {
@@ -78,24 +93,51 @@ function revoke(m: { src: string; isBlob?: boolean } | null): void {
   if (m?.isBlob && m.src.startsWith("blob:")) URL.revokeObjectURL(m.src);
 }
 
-// Append clips back-to-back so the track stays gapless.
-function relayout(clips: Clip[]): Clip[] {
-  let t = 0;
-  return clips.map((c) => {
-    const next = { ...c, start: t };
-    t += c.duration;
-    return next;
-  });
+const newTrack = (name: string): Track => ({
+  id: uid(),
+  name,
+  kind: "video",
+  clips: [],
+  hidden: false,
+  locked: false,
+  solo: false,
+});
+
+// Every clip across all tracks, flattened.
+export function allClips(tracks: Track[]): Clip[] {
+  return tracks.flatMap((t) => t.clips);
 }
 
+// Locate a clip and its position by id.
+function locate(tracks: Track[], id: string): { ti: number; ci: number } | null {
+  for (let ti = 0; ti < tracks.length; ti++) {
+    const ci = tracks[ti].clips.findIndex((c) => c.id === id);
+    if (ci >= 0) return { ti, ci };
+  }
+  return null;
+}
+
+export function findClip(tracks: Track[], id: string | null): Clip | null {
+  if (!id) return null;
+  for (const t of tracks) {
+    const c = t.clips.find((x) => x.id === id);
+    if (c) return c;
+  }
+  return null;
+}
+
+// End of the last clip in a track (where a freshly appended clip should start).
+const trackEnd = (t: Track): number =>
+  t.clips.reduce((max, c) => Math.max(max, c.start + c.duration), 0);
+
 interface Snapshot {
-  clips: Clip[];
+  tracks: Track[];
   comp: Composition;
 }
 
 interface EditorState {
   media: MediaItem[];
-  clips: Clip[];
+  tracks: Track[];
   audio: MediaItem | null;
   comp: Composition;
   playhead: number;
@@ -108,13 +150,21 @@ interface EditorState {
   addMedia: (items: NewMedia[]) => MediaItem[];
   setMediaDuration: (id: string, ms: number) => void;
   removeMedia: (id: string) => void;
-  addClip: (mediaId: string) => void;
+
+  // tracks
+  addTrack: () => void;
+  removeTrack: (id: string) => void;
+  toggleTrack: (id: string, flag: "hidden" | "locked" | "solo") => void;
+
+  // clips
+  addClip: (mediaId: string, trackId?: string) => void;
   removeClip: (id: string) => void;
   duplicateClip: (id: string) => void;
   splitClip: (id: string, atMs: number) => void;
-  moveClip: (id: string, toIndex: number) => void;
+  placeClip: (id: string, trackId: string, start: number) => void;
   selectClip: (id: string | null) => void;
   setClipDuration: (id: string, ms: number) => void;
+  setClipStart: (id: string, ms: number) => void;
   updateClip: (id: string, partial: Partial<Clip>) => void;
 
   // transform + keyframes
@@ -145,9 +195,9 @@ interface EditorState {
 }
 
 export const useEditor = create<EditorState>((set, get) => {
-  // Snapshot the editable surface (clips + comp) for undo/redo.
+  // Snapshot the editable surface (tracks + comp) for undo/redo.
   const snap = (s: EditorState): Snapshot => ({
-    clips: structuredClone(s.clips),
+    tracks: structuredClone(s.tracks),
     comp: { ...s.comp },
   });
   const push = (s: EditorState): Pick<EditorState, "past" | "future"> => ({
@@ -158,13 +208,13 @@ export const useEditor = create<EditorState>((set, get) => {
   // Clip-local playhead time, clamped to the clip's span.
   const localNow = (c: Clip): number => clamp(get().playhead - c.start, 0, c.duration);
 
-  // Map over clips, replacing the one with `id` via `fn`.
-  const mapClip = (id: string, fn: (c: Clip) => Clip): Clip[] =>
-    get().clips.map((c) => (c.id === id ? fn(c) : c));
+  // Replace the clip with `id` (wherever it lives) via `fn`.
+  const mapClip = (id: string, fn: (c: Clip) => Clip): Track[] =>
+    get().tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === id ? fn(c) : c)) }));
 
   return {
     media: [],
-    clips: [],
+    tracks: [newTrack("V1")],
     audio: null,
     comp: { width: 1920, height: 1080, fps: 30, bg: "#000000" },
     playhead: 0,
@@ -189,49 +239,88 @@ export const useEditor = create<EditorState>((set, get) => {
         return {
           ...push(s),
           media: s.media.filter((m) => m.id !== id),
-          clips: relayout(s.clips.filter((c) => c.mediaId !== id)),
+          tracks: s.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => c.mediaId !== id) })),
         };
       }),
 
-    addClip: (mediaId) =>
+    // ---- tracks --------------------------------------------------------------
+
+    addTrack: () =>
+      set((s) => ({ ...push(s), tracks: [...s.tracks, newTrack(`V${s.tracks.length + 1}`)] })),
+
+    removeTrack: (id) =>
+      set((s) => {
+        if (s.tracks.length <= 1) return {}; // keep at least one
+        const gone = s.tracks.find((t) => t.id === id);
+        const selGone = gone?.clips.some((c) => c.id === s.selectedClipId);
+        return {
+          ...push(s),
+          tracks: s.tracks.filter((t) => t.id !== id),
+          selectedClipId: selGone ? null : s.selectedClipId,
+          selectedKeyframe: selGone ? null : s.selectedKeyframe,
+        };
+      }),
+
+    toggleTrack: (id, flag) =>
+      set((s) => ({
+        tracks: s.tracks.map((t) => (t.id === id ? { ...t, [flag]: !t[flag] } : t)),
+      })),
+
+    // ---- clips ---------------------------------------------------------------
+
+    addClip: (mediaId, trackId) =>
       set((s) => {
         const m = s.media.find((x) => x.id === mediaId);
         const duration = m?.kind === "video" && m.duration ? m.duration : DEFAULT_CLIP_MS;
+        const tIdx = trackId ? s.tracks.findIndex((t) => t.id === trackId) : 0;
+        const ti = tIdx >= 0 ? tIdx : 0;
         const clip: Clip = {
           id: uid(),
+          type: "media",
           mediaId,
-          start: 0,
+          start: trackEnd(s.tracks[ti]),
           duration,
           trimStart: 0,
           fit: "contain",
           transform: { ...DEFAULT_TRANSFORM },
         };
-        return { ...push(s), clips: relayout([...s.clips, clip]), selectedClipId: clip.id };
+        const tracks = s.tracks.map((t, i) =>
+          i === ti ? { ...t, clips: [...t.clips, clip] } : t,
+        );
+        return { ...push(s), tracks, selectedClipId: clip.id };
       }),
 
     removeClip: (id) =>
       set((s) => ({
         ...push(s),
-        clips: relayout(s.clips.filter((c) => c.id !== id)),
+        tracks: s.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => c.id !== id) })),
         selectedClipId: s.selectedClipId === id ? null : s.selectedClipId,
         selectedKeyframe: null,
       })),
 
     duplicateClip: (id) =>
       set((s) => {
-        const idx = s.clips.findIndex((c) => c.id === id);
-        if (idx < 0) return {};
-        const copy: Clip = { ...structuredClone(s.clips[idx]), id: uid() };
-        const arr = [...s.clips];
-        arr.splice(idx + 1, 0, copy);
-        return { ...push(s), clips: relayout(arr), selectedClipId: copy.id };
+        const at = locate(s.tracks, id);
+        if (!at) return {};
+        const orig = s.tracks[at.ti].clips[at.ci];
+        const copy: Clip = {
+          ...structuredClone(orig),
+          id: uid(),
+          start: orig.start + orig.duration,
+        };
+        const tracks = s.tracks.map((t, i) =>
+          i === at.ti
+            ? { ...t, clips: [...t.clips.slice(0, at.ci + 1), copy, ...t.clips.slice(at.ci + 1)] }
+            : t,
+        );
+        return { ...push(s), tracks, selectedClipId: copy.id };
       }),
 
     splitClip: (id, atMs) =>
       set((s) => {
-        const idx = s.clips.findIndex((c) => c.id === id);
-        if (idx < 0) return {};
-        const c = s.clips[idx];
+        const at = locate(s.tracks, id);
+        if (!at) return {};
+        const c = s.tracks[at.ti].clips[at.ci];
         const local = atMs - c.start;
         if (local <= MIN_CLIP_MS || local >= c.duration - MIN_CLIP_MS) return {};
         const isVideo = s.media.find((m) => m.id === c.mediaId)?.kind === "video";
@@ -256,47 +345,51 @@ export const useEditor = create<EditorState>((set, get) => {
         const second: Clip = {
           ...structuredClone(c),
           id: uid(),
+          start: c.start + local,
           duration: c.duration - local,
           trimStart: c.trimStart + (isVideo ? local : 0),
           transform: splitTransform(c.transform, "b"),
         };
-        const arr = [...s.clips];
-        arr.splice(idx, 1, first, second);
-        return { ...push(s), clips: relayout(arr), selectedClipId: second.id, selectedKeyframe: null };
+        const tracks = s.tracks.map((t, i) =>
+          i === at.ti
+            ? { ...t, clips: [...t.clips.slice(0, at.ci), first, second, ...t.clips.slice(at.ci + 1)] }
+            : t,
+        );
+        return { ...push(s), tracks, selectedClipId: second.id, selectedKeyframe: null };
       }),
 
-    moveClip: (id, toIndex) =>
+    // Move a clip to a track + start (drag on the timeline). Live; UI pushes history.
+    placeClip: (id, trackId, start) =>
       set((s) => {
-        const arr = [...s.clips];
-        const from = arr.findIndex((c) => c.id === id);
-        if (from < 0) return {};
-        const [it] = arr.splice(from, 1);
-        arr.splice(clamp(toIndex, 0, arr.length), 0, it);
-        return { clips: relayout(arr) };
+        const at = locate(s.tracks, id);
+        if (!at) return {};
+        const clip = { ...s.tracks[at.ti].clips[at.ci], start: Math.max(0, Math.round(start)) };
+        const destIdx = s.tracks.findIndex((t) => t.id === trackId);
+        if (destIdx < 0) return {};
+        const tracks = s.tracks.map((t, i) => {
+          let clips = i === at.ti ? t.clips.filter((c) => c.id !== id) : t.clips;
+          if (i === destIdx) clips = [...clips.filter((c) => c.id !== id), clip].sort((a, b) => a.start - b.start);
+          return clips === t.clips ? t : { ...t, clips };
+        });
+        return { tracks };
       }),
 
     selectClip: (id) => set({ selectedClipId: id, selectedKeyframe: null }),
 
     setClipDuration: (id, ms) =>
-      set((s) => ({
-        clips: relayout(
-          s.clips.map((c) =>
-            c.id === id ? { ...c, duration: Math.max(MIN_CLIP_MS, Math.round(ms)) } : c,
-          ),
-        ),
-      })),
+      set({ tracks: mapClip(id, (c) => ({ ...c, duration: Math.max(MIN_CLIP_MS, Math.round(ms)) })) }),
+
+    setClipStart: (id, ms) =>
+      set({ tracks: mapClip(id, (c) => ({ ...c, start: Math.max(0, Math.round(ms)) })) }),
 
     updateClip: (id, partial) =>
-      set((s) => {
-        const clips = s.clips.map((c) => (c.id === id ? { ...c, ...partial } : c));
-        return { ...push(s), clips: "duration" in partial ? relayout(clips) : clips };
-      }),
+      set((s) => ({ ...push(s), tracks: mapClip(id, (c) => ({ ...c, ...partial })) })),
 
     // ---- transform + keyframes (live; UI calls pushHistory at gesture start) --
 
     applyTransform: (id, key, value) =>
       set(() => ({
-        clips: mapClip(id, (c) => {
+        tracks: mapClip(id, (c) => {
           const cur = c.transform[key];
           if (Array.isArray(cur)) {
             const t = localNow(c);
@@ -314,7 +407,7 @@ export const useEditor = create<EditorState>((set, get) => {
     toggleKeyframe: (id, key) =>
       set((s) => ({
         ...push(s),
-        clips: mapClip(id, (c) => {
+        tracks: mapClip(id, (c) => {
           const cur = c.transform[key];
           const t = localNow(c);
           if (Array.isArray(cur)) {
@@ -329,7 +422,7 @@ export const useEditor = create<EditorState>((set, get) => {
 
     setKeyframeTime: (id, key, index, t) =>
       set(() => ({
-        clips: mapClip(id, (c) => {
+        tracks: mapClip(id, (c) => {
           const cur = c.transform[key];
           if (!Array.isArray(cur) || !cur[index]) return c;
           const arr = cur.map((k) => ({ ...k }));
@@ -340,7 +433,7 @@ export const useEditor = create<EditorState>((set, get) => {
 
     sortKeyframes: (id, key) =>
       set(() => ({
-        clips: mapClip(id, (c) => {
+        tracks: mapClip(id, (c) => {
           const cur = c.transform[key];
           if (!Array.isArray(cur)) return c;
           return { ...c, transform: { ...c.transform, [key]: [...cur].sort((a, b) => a.t - b.t) } };
@@ -350,7 +443,7 @@ export const useEditor = create<EditorState>((set, get) => {
     setKeyframeEasing: (id, key, t, ease) =>
       set((s) => ({
         ...push(s),
-        clips: mapClip(id, (c) => {
+        tracks: mapClip(id, (c) => {
           const cur = c.transform[key];
           if (!Array.isArray(cur)) return c;
           const arr = cur.map((k) => (Math.abs(k.t - t) < 1 ? { ...k, ease } : k));
@@ -361,7 +454,7 @@ export const useEditor = create<EditorState>((set, get) => {
     applyPreset: (id, presetId) =>
       set((s) => ({
         ...push(s),
-        clips: mapClip(id, (c) => {
+        tracks: mapClip(id, (c) => {
           const t0 = localNow(c);
           const tf = { ...c.transform };
           const baseX = evalProp(tf.x, t0, 0);
@@ -411,7 +504,7 @@ export const useEditor = create<EditorState>((set, get) => {
     resetTransform: (id) =>
       set((s) => ({
         ...push(s),
-        clips: mapClip(id, (c) => ({ ...c, transform: { ...DEFAULT_TRANSFORM } })),
+        tracks: mapClip(id, (c) => ({ ...c, transform: { ...DEFAULT_TRANSFORM } })),
         selectedKeyframe: null,
       })),
 
@@ -446,7 +539,7 @@ export const useEditor = create<EditorState>((set, get) => {
         const prev = s.past[s.past.length - 1];
         if (!prev) return {};
         return {
-          clips: prev.clips,
+          tracks: prev.tracks,
           comp: prev.comp,
           past: s.past.slice(0, -1),
           future: [snap(s), ...s.future].slice(0, 60),
@@ -459,7 +552,7 @@ export const useEditor = create<EditorState>((set, get) => {
         const next = s.future[0];
         if (!next) return {};
         return {
-          clips: next.clips,
+          tracks: next.tracks,
           comp: next.comp,
           past: [...s.past, snap(s)].slice(-60),
           future: s.future.slice(1),
@@ -475,7 +568,7 @@ export const useEditor = create<EditorState>((set, get) => {
         revoke(s.audio);
         return {
           media: [],
-          clips: [],
+          tracks: [newTrack("V1")],
           audio: null,
           playhead: 0,
           playing: false,
@@ -486,7 +579,8 @@ export const useEditor = create<EditorState>((set, get) => {
         };
       }),
 
-    duration: () => get().clips.reduce((sum, c) => sum + c.duration, 0),
+    duration: () =>
+      allClips(get().tracks).reduce((max, c) => Math.max(max, c.start + c.duration), 0),
   };
 });
 

@@ -3,7 +3,7 @@ import { MediaBin } from "../edit/MediaBin";
 import { PreviewMonitor } from "../edit/PreviewMonitor";
 import { Inspector } from "../edit/Inspector";
 import { Timeline } from "../edit/Timeline";
-import { useEditor } from "../../store/editor";
+import { useEditor, allClips, findClip } from "../../store/editor";
 
 // The editing workspace: media bin + preview + inspector on top, timeline below.
 export function EditWindow() {
@@ -30,12 +30,21 @@ export function EditWindow() {
         e.preventDefault();
         st.stepFrame(e.shiftKey ? 10 : 1);
       } else if (e.code === "KeyS" && !mod) {
-        // Split the clip under the playhead.
-        const c = st.clips.find((x) => st.playhead > x.start && st.playhead < x.start + x.duration);
+        // Split the clip under the playhead — prefer the selected one.
+        const spans = (x: { start: number; duration: number }): boolean =>
+          st.playhead > x.start && st.playhead < x.start + x.duration;
+        const sel = findClip(st.tracks, st.selectedClipId);
+        const c = sel && spans(sel) ? sel : allClips(st.tracks).find(spans);
         if (c) {
           e.preventDefault();
           st.splitClip(c.id, st.playhead);
         }
+      } else if (e.code === "Home") {
+        e.preventDefault();
+        st.setPlayhead(0);
+      } else if (e.code === "End") {
+        e.preventDefault();
+        st.setPlayhead(st.duration());
       } else if ((e.code === "Delete" || e.code === "Backspace") && st.selectedClipId) {
         e.preventDefault();
         st.removeClip(st.selectedClipId);
