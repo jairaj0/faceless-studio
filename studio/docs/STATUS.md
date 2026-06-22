@@ -13,9 +13,9 @@ The first end-to-end vertical slice works: **import images → arrange on timeli
 | Command registry | ✅ | `commands/` — registry + keymap |
 | Electron + Vite + React shell (boots) | ✅ | `npm run dev` works |
 | **M1 — Menu bar** | ✅ | command-driven; items light up per milestone |
-| M2 — Engine + Monitor | ✅ | compositing engine (fit + transform: scale/pos/rotate/opacity, res-independent) + Monitor (play/scrub/step) · keyframed scene layers → M8 |
-| M3 — Timeline | ✅ | image/video clips, scrub, drag-resize duration, **drag-reorder**, select, playhead |
-| M4 — Inspector | ✅ | comp (bg/fps) + clip props (fit, scale, X/Y, rotation, opacity, duration, video trim, remove) |
+| M2 — Engine + Monitor | ✅ | compositing + **keyframe animation engine** (evalProp + 6 easings, res-independent) + Monitor (play/scrub/step) · scene/code layers → M8 |
+| M3 — Timeline | ✅ | clips: scrub, trim, reorder, **razor/split, snapping, zoom, keyframe diamonds, context menu**, playhead |
+| M4 — Inspector | ✅ | comp (bg/fps) + clip transform with **keyframes (◆) + easing + motion presets** + fit, duration, video trim |
 | M5 — Project I/O | ✅ | save/open .json serializes full editor (comp+media-by-path+clips+audio); media re-read on open · autosave → M9 |
 | M6 — Export (native ffmpeg) | ✅ | canvas frames → ffmpeg H.264 mp4, 720p–8K + audio mux |
 | M7 — Media + Audio | 🔨 | image/**video**/audio import (buttons + drag&drop) ✅ · video plays in preview + renders in export ✅ · video's own audio + Web Audio preview = later |
@@ -39,7 +39,8 @@ Currently the menu bar has **File** only (New/Open/Import Image/Import Audio/Sav
 `research/video-editor/app/` = previous working build. Port proven modules from there.
 
 ## Editing shortcuts (Edit window)
-Space = play/pause · ←/→ = step 1 frame (⇧ = 10) · Delete/Backspace = remove selected clip.
+Space play/pause · ←/→ step 1 frame (⇧ = 10) · S split at playhead · ⌘D duplicate · ⌘Z / ⇧⌘Z undo/redo
+· Delete/Backspace remove selected clip. Timeline tools: ⬚ select · ✂ razor · 🧲 snap · −/Fit/+ zoom.
 
 ## Right now
 Imported media is fully **editable + saveable + exportable**: drag-reorder/resize clips on the

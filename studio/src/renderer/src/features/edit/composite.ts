@@ -1,4 +1,6 @@
 import type { Clip, Composition, MediaItem } from "../../store/editor";
+import { TF_DEFAULT } from "../../store/editor";
+import { evalProp } from "./animate";
 
 // Decoded media cached by src URL. Both preview and export draw through here so
 // what you see is what gets rendered.
@@ -128,8 +130,8 @@ export async function prepareFrame(media: MediaItem[], clips: Clip[], t: number)
   await seek(v, localTime(clip, m, t));
 }
 
-// Draw a source with the clip's fit mode + transform. Positions/scale are
-// fractions of the comp, so the result is identical at any export resolution.
+// Draw a source with the clip's fit mode + a resolved transform. Positions/scale
+// are fractions of the comp, so the result is identical at any export resolution.
 function drawSource(
   ctx: CanvasRenderingContext2D,
   comp: Composition,
@@ -137,6 +139,7 @@ function drawSource(
   sw: number,
   sh: number,
   clip: Clip,
+  localT: number,
 ): void {
   if (!sw || !sh) return;
   const { width: W, height: H } = comp;
@@ -150,12 +153,19 @@ function drawSource(
     dw = sw * base;
     dh = sh * base;
   }
-  const tr = clip.transform;
+  // Evaluate (possibly keyframed) transform props at the clip-local time.
+  const tf = clip.transform;
+  const x = evalProp(tf.x, localT, TF_DEFAULT.x);
+  const y = evalProp(tf.y, localT, TF_DEFAULT.y);
+  const scale = evalProp(tf.scale, localT, TF_DEFAULT.scale);
+  const rotation = evalProp(tf.rotation, localT, TF_DEFAULT.rotation);
+  const opacity = evalProp(tf.opacity, localT, TF_DEFAULT.opacity);
+
   ctx.save();
-  ctx.globalAlpha = Math.max(0, Math.min(1, tr.opacity));
-  ctx.translate(W / 2 + tr.x * W, H / 2 + tr.y * H);
-  ctx.rotate((tr.rotation * Math.PI) / 180);
-  ctx.scale(tr.scale, tr.scale);
+  ctx.globalAlpha = Math.max(0, Math.min(1, opacity));
+  ctx.translate(W / 2 + x * W, H / 2 + y * H);
+  ctx.rotate((rotation * Math.PI) / 180);
+  ctx.scale(scale, scale);
   ctx.drawImage(src, -dw / 2, -dh / 2, dw, dh);
   ctx.restore();
 }
@@ -176,12 +186,14 @@ export function drawFrame(
   if (!clip) return;
   const m = media.find((x) => x.id === clip.mediaId);
   if (!m) return;
+  const localT = t - clip.start;
 
   if (m.kind === "video") {
     const v = getVideo(m.src);
-    if (v.readyState >= 2) drawSource(ctx, comp, v, v.videoWidth, v.videoHeight, clip);
+    if (v.readyState >= 2) drawSource(ctx, comp, v, v.videoWidth, v.videoHeight, clip, localT);
   } else {
     const img = getImage(m.src);
-    if (img.complete && img.naturalWidth) drawSource(ctx, comp, img, img.naturalWidth, img.naturalHeight, clip);
+    if (img.complete && img.naturalWidth)
+      drawSource(ctx, comp, img, img.naturalWidth, img.naturalHeight, clip, localT);
   }
 }

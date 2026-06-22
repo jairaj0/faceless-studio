@@ -13,7 +13,14 @@ export function EditWindow() {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
       const st = useEditor.getState();
-      if (e.code === "Space") {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.code === "KeyZ") {
+        e.preventDefault();
+        e.shiftKey ? st.redo() : st.undo();
+      } else if (mod && e.code === "KeyD" && st.selectedClipId) {
+        e.preventDefault();
+        st.duplicateClip(st.selectedClipId);
+      } else if (e.code === "Space") {
         e.preventDefault();
         st.togglePlay();
       } else if (e.code === "ArrowLeft") {
@@ -22,6 +29,13 @@ export function EditWindow() {
       } else if (e.code === "ArrowRight") {
         e.preventDefault();
         st.stepFrame(e.shiftKey ? 10 : 1);
+      } else if (e.code === "KeyS" && !mod) {
+        // Split the clip under the playhead.
+        const c = st.clips.find((x) => st.playhead > x.start && st.playhead < x.start + x.duration);
+        if (c) {
+          e.preventDefault();
+          st.splitClip(c.id, st.playhead);
+        }
       } else if ((e.code === "Delete" || e.code === "Backspace") && st.selectedClipId) {
         e.preventDefault();
         st.removeClip(st.selectedClipId);

@@ -4,6 +4,36 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — Day 1 (later 6): keyframes + pro timeline tools (ported from reference)
+**Done — ported the *working* parts of `research/video-editor/app` into studio's clip model:**
+- **Animation engine** (`features/edit/animate.ts`): `evalProp` + 6 easings (linear/easeIn/Out/InOut/
+  OutCubic/OutBack). Pure function of time → preview and ffmpeg export animate identically.
+- **Keyframe-able transforms**: each clip transform prop (scale/x/y/rotation/opacity) is now
+  `number | Keyframe[]`. Keyframe times are **clip-local** (survive reorder/resize/split, unlike the
+  reference's absolute-scene times). `composite.ts` evaluates props at clip-local time per frame.
+- **Inspector** is now an Effect-Controls panel: ◇/◆ keyframe toggle per property (◆ = write keyframe
+  at playhead), live value readout, **easing dropdown** for the selected keyframe, **motion presets**
+  (Fade In/Out, Slide ←→↑↓, Pop, Spin) — all from the reference.
+- **Timeline tools**: razor/split (✂ tool + S key + context menu, splits keyframes too), **snapping**
+  (🧲, to playhead/clip bounds), **zoom** (−/Fit/+), **keyframe diamonds** on the clip row (drag to
+  retime, click to select), right-click **context menu** (split/duplicate/delete) — plus existing
+  reorder/trim/scrub.
+- **Undo/redo** (clips+comp snapshots, 60 deep) — ⌘Z / ⇧⌘Z. Continuous gestures push history once at
+  start; discrete actions auto-commit.
+- **Edit shortcuts** added: S split-at-playhead, ⌘D duplicate, ⌘Z/⇧⌘Z undo/redo (+ existing
+  space/arrows/delete).
+- Export needs no change — it shares `drawFrame`, so keyframed motion renders straight into the MP4.
+- Deliberately **left for M8** (text/shape/svg/**code** layers, the animated-background system) and the
+  audio-volume/waveform work — only ported what actually worked.
+
+**Next**
+- M8: scene/code layers (animated web backgrounds) · audio volume+fades · export aspect/platform presets.
+
+**Blocked**
+- None.
+
+---
+
 ## 2026-06-22 — Day 1 (later 5): editable MVP — engine + inspector + reorder + save/open
 **Done**
 - **Compositing engine** (`composite.ts`) now applies per-clip **fit mode** (contain/cover/fill) +
