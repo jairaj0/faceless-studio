@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { useEditor } from "./editor";
 
-export type AppView = "edit" | "export";
+export type AppView = "edit" | "library" | "export";
 
 /** Placeholder document — future milestones fill `scene`. */
 export interface ProjectDoc {

@@ -4,6 +4,32 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — Library window: ReactBits-style component presets (Import & Preview)
+**Done:**
+- **New "Library" window** (Import & Preview) re-added — 3 views now: Edit ⌘1 / **Library ⌘2** / Export ⌘3
+  (Export moved 2→3; `window.commands.ts`, MenuBar tabs, View menu all updated).
+- **Component preset gallery** (`features/library/presets.ts`, 13 presets across Text / Background / UI):
+  Gradient/Shiny/Blur-In/Wave/Glitch/Typewriter/Count-Up text, Aurora/Mesh/Particle/Grid backgrounds,
+  Glow Button + Live Badge UI. Authored as HTML(+gsap/CSS) or React/JSX — resolution-independent (vh/vw),
+  loop-friendly, and **frame-accurate on export** (CSS @keyframes / gsap / `window.__seek` for the counter).
+- **`LibraryWindow.tsx`** — searchable, category-filtered grid; each card live-previews in the *same*
+  sandboxed-iframe runtime as real code layers (reuses `buildCodeSrcdoc`), driven by one shared host clock
+  (rAF → `seek`) so all cards animate in lockstep. "Add to timeline" → `addCodeClip({lang,source})` +
+  jump to Edit. No dead buttons: gallery works before the tab was wired.
+- Boot-tested (`npm run preview`): clean start, ffmpeg 6.0, no crash; `npm run build` green (66 modules).
+
+**Next:** optional — user-pasteable custom component import; thumbnail poster for heavy presets; more presets.
+
+---
+
+## 2026-06-22 — App logo (keyframe-play mark)
+**Done:**
+- Upgraded `scripts/make-icon.mjs` (2× supersampled, squircle/superellipse, 3-stop gradient, A/B/C variants);
+  shipped **variant B** (play triangle + keyframe-diamond track) as `build/icon.png`; rebuilt the unsigned .dmg
+  with the new `icon.icns`.
+
+---
+
 ## 2026-06-22 — M9: polish + real installers — COMPLETE (project shippable)
 **Done:**
 - **Branding**: dependency-free icon generator (`scripts/make-icon.mjs` → `build/icon.png`, raw RGBA→PNG via

@@ -44,9 +44,10 @@ Menu bar: **File** (New/Open/Import Image·Video·Audio/Save/Save As) · **Inser
 `npm run dist:mac` → `release/Faceless Studio-<ver>-arm64.dmg` · `npm run dist:win` → NSIS .exe · `npm run icon` regenerates `build/icon.png`.
 electron-builder config lives in `package.json` › `build`; ffmpeg-static is `asarUnpack`ed so the bundled binary stays executable. Builds are unsigned (set `CSC_IDENTITY_AUTO_DISCOVERY=false` or add signing creds for distribution).
 
-## Windows (2 views)
+## Windows (3 views)
 - **Edit** (⌘1) — Media bin (import) + Preview monitor + Timeline
-- **Export** (⌘2) — reads the Edit timeline → native-ffmpeg render (720p/1080p/4K/8K + audio)
+- **Library** (⌘2) — Import & Preview: gallery of ReactBits-style component presets (HTML/React+gsap). Each card live-previews in the same sandboxed-iframe runtime as real code layers (what you see = what exports); "Add to timeline" drops it as an editable code-layer clip and jumps to Edit. Search + Text/Background/UI filters. Presets in `features/library/presets.ts`.
+- **Export** (⌘3) — reads the Edit timeline → native-ffmpeg render (720p/1080p/4K/8K + audio)
 
 ## Reference
 `research/video-editor/app/` = previous working build. Port proven modules from there.
