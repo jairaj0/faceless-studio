@@ -4,6 +4,33 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — M9: polish + real installers — COMPLETE (project shippable)
+**Done:**
+- **Branding**: dependency-free icon generator (`scripts/make-icon.mjs` → `build/icon.png`, raw RGBA→PNG via
+  zlib: violet→teal rounded tile + play triangle); app/product name "Faceless Studio"; onboarding empty-state
+  in the preview (quick actions: import media / +background / +text / +code) replacing the bare placeholder.
+- **Menus** (no dead buttons — all features now exist): added **Insert** (Text T / Background B / Code L) and
+  **View** (Edit ⌘1 / Export ⌘2) menus + `insert.commands.ts` registered in builtins.
+- **Autosave + crash recovery**: `dirty` flag on the app store (set on real *document* edits only — tracks/
+  comp/media/audio, ignoring playhead/selection churn via reference-identity diff; cleared on Save/Open/New).
+  `useAutosave` debounces 1.5s → writes a snapshot to `userData/recovery.fstudio.json` (main: `recovery.ts`
+  service + `recovery:write/read/clear` IPC + preload `window.api.recovery`). `RecoveryBanner` reads it on
+  launch and offers Restore / Discard. Save/Open clear the snapshot so it only resurfaces after an unclean exit.
+  Refactored `projectActions` → `buildProjectFile()` / `loadProjectFile()` reused by Save + autosave + Open.
+- **Real installers**: electron-builder `build` config in package.json (appId, productName, mac dmg / win nsis /
+  linux AppImage, icon, `asarUnpack` ffmpeg-static so the binary is executable in the bundle). Scripts
+  `dist` / `dist:mac` / `dist:win` / `icon`. **Built a real `release/Faceless Studio-0.1.0-arm64.dmg`
+  (116 MB, unsigned)**; verified ffmpeg lands in `app.asar.unpacked`.
+- typecheck ✅ · build ✅ · `npm run preview` boots the packaged app cleanly (ffmpeg 6.0 detected) · dmg built ✅.
+- **All milestones M0–M9 complete.** Faceless Studio is a self-contained, installable desktop animation→video
+  editor: multi-track timeline, keyframe animation, text/colour/transitions, audio (waveform/volume/fades),
+  procedural animated backgrounds, live code layers (HTML/React+gsap), native-ffmpeg export to 720p–8K, and
+  project save/open + crash recovery.
+- **Next (optional, post-1.0):** code-signing/notarization for distribution; mux a video clip's own audio;
+  multi-window; richer code-layer templates.
+
+---
+
 ## 2026-06-22 — M8: animated backgrounds + code layers — COMPLETE
 **Done — engine extended (user lifted the "don't change engine" rule: best result wins):**
 - **Two new clip types** `background` and `code` (`ClipType` widened; clips carry optional `bg`/`code` specs).

@@ -3,6 +3,7 @@ import { useEditor } from "../../store/editor";
 import { drawFrame, getImage, getVideo, localTime, pauseVideos, visibleClipsAt } from "./composite";
 import { syncAudio, stopAudio } from "./audioPreview";
 import { CodeOverlay } from "./CodeOverlay";
+import { importImages } from "./importActions";
 
 export function fmtTime(ms: number): string {
   const s = Math.max(0, ms) / 1000;
@@ -138,9 +139,7 @@ export function PreviewMonitor() {
         }}
       >
         {!hasClips ? (
-          <p style={{ color: "var(--fg-3)", fontSize: 12 }}>
-            Add media to the timeline to see a preview.
-          </p>
+          <EmptyState />
         ) : (
           <>
             <canvas
@@ -198,6 +197,54 @@ export function PreviewMonitor() {
         <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--fg-3)" }}>
           {comp.width}×{comp.height} · {comp.fps}fps
         </span>
+      </div>
+    </div>
+  );
+}
+
+// Onboarding shown when the timeline is empty — quick ways to start a project.
+function EmptyState() {
+  const addBackgroundClip = useEditor((s) => s.addBackgroundClip);
+  const addTextClip = useEditor((s) => s.addTextClip);
+  const addCodeClip = useEditor((s) => s.addCodeClip);
+  const actions: { label: string; hint: string; run: () => void }[] = [
+    { label: "🖼  Import media", hint: "image / video", run: () => void importImages() },
+    { label: "▦  Animated background", hint: "B", run: () => addBackgroundClip() },
+    { label: "T  Text layer", hint: "T", run: () => addTextClip() },
+    { label: "</>  Code layer", hint: "L · HTML / React + gsap", run: () => addCodeClip() },
+  ];
+  return (
+    <div style={{ textAlign: "center", color: "var(--fg-2)", maxWidth: 320 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Faceless Studio</div>
+      <div style={{ fontSize: 12, color: "var(--fg-3)", marginBottom: 18 }}>
+        Start your animation — everything is resolution-independent and exports frame-accurately.
+      </div>
+      <div style={{ display: "grid", gap: 8 }}>
+        {actions.map((a) => (
+          <button
+            key={a.label}
+            onClick={a.run}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: "10px 14px",
+              fontSize: 13,
+              color: "var(--fg)",
+              background: "var(--bg-1)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--accent)")}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+          >
+            <span>{a.label}</span>
+            <span style={{ fontSize: 10.5, color: "var(--fg-3)" }}>{a.hint}</span>
+          </button>
+        ))}
       </div>
     </div>
   );

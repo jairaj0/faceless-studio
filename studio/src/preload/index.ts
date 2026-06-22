@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { SaveResult, OpenResult } from "../shared/project";
+import type { SaveResult, OpenResult, RecoverySnapshot } from "../shared/project";
 import type { ImportedMedia, MediaKind } from "../shared/media";
 import type { ExportEncodeRequest, ExportProgress, ExportResult } from "../shared/export";
 
@@ -9,6 +9,12 @@ const api = {
     save: (json: string, path?: string): Promise<SaveResult> =>
       ipcRenderer.invoke("project:save", { json, path }),
     open: (): Promise<OpenResult | null> => ipcRenderer.invoke("project:open"),
+  },
+  recovery: {
+    write: (json: string, name: string): Promise<boolean> =>
+      ipcRenderer.invoke("recovery:write", { json, name }),
+    read: (): Promise<RecoverySnapshot | null> => ipcRenderer.invoke("recovery:read"),
+    clear: (): Promise<boolean> => ipcRenderer.invoke("recovery:clear"),
   },
   media: {
     import: (kind: MediaKind): Promise<ImportedMedia[] | null> =>

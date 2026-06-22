@@ -9,3 +9,9 @@ export interface OpenResult {
   path: string;
   json: string;
 }
+
+export interface RecoverySnapshot {
+  savedAt: number; // epoch ms of the autosave
+  name: string;
+  json: string; // the serialized project file
+}

@@ -2,7 +2,7 @@
 
 Updated: 2026-06-22 · Legend: ✅ done · 🔨 in progress · ❌ not started
 
-## Current milestone: **M8 done — animated backgrounds + code layers ✅** (Stages 1–6)
+## Current milestone: **🎉 ALL MILESTONES DONE (M0–M9) — shippable .dmg built**
 
 The first end-to-end vertical slice works: **import images/video → arrange on N timeline tracks → preview → export MP4 (native ffmpeg)** at 720p/1080p/4K/8K, optional audio muxed in.
 
@@ -28,16 +28,21 @@ Premiere-style N tracks: each track has free-positioned clips (gaps allowed); hi
 | M6 — Export (native ffmpeg) | ✅ | canvas frames → ffmpeg H.264 mp4, 720p–8K + audio mux |
 | M7 — Media + Audio | ✅ | image/**video**/audio import (buttons + drag&drop) ✅ · video plays in preview + renders in export ✅ · **Web Audio preview + waveform + volume + fades** ✅ · video's own audio mux = later |
 | M8 — Backgrounds + Code layers | ✅ | **10 procedural animated backgrounds** (pure canvas fns of clip-local time → frame-accurate, preview==export) + gallery modal + Inspector (preset grid, 3 colours, speed) · **Code layers (HTML/CSS/JS or React/JSX + gsap)** in a sandboxed iframe, live in preview overlay, exported frame-accurately via modern-screenshot rasterisation at render resolution; vendored react/react-dom/babel/gsap/modern-screenshot |
-| M9 — Polish + Package | ❌ | |
+| M9 — Polish + Package | ✅ | **Branding** (app icon, "Faceless Studio" name, onboarding empty-state w/ quick actions) · **Insert + View menus** (Text/Background/Code · Edit/Export) · **autosave + crash recovery** (debounced dirty-tracked snapshot in userData → restore banner on next launch) · **real installers via electron-builder** (`npm run dist:mac/:win`, ffmpeg unpacked from asar) — produced `release/Faceless Studio-0.1.0-arm64.dmg` |
 
 ## Menu policy (IMPORTANT)
 Only menus/items that actually WORK are shown. Build feature → then add its menu item.
-Currently the menu bar has **File** only (New/Open/Import Image/Import Audio/Save/Save As).
+Menu bar: **File** (New/Open/Import Image·Video·Audio/Save/Save As) · **Insert** (Text/Background/Code) · **View** (Edit/Export).
 
 ## Commands implemented so far
 ✅ File: `file.new`, `file.open`, `file.save`, `file.saveAs` (project saved as .json)
 ✅ Media: `media.importImage` (⌘I), `media.importVideo`, `media.importAudio` (+ drag & drop onto Media bin)
+✅ Insert: `insert.text` (T), `insert.background` (B), `insert.code` (L)
 ✅ Window: `window.edit` (⌘1), `window.export` (⌘2)
+
+## Packaging
+`npm run dist:mac` → `release/Faceless Studio-<ver>-arm64.dmg` · `npm run dist:win` → NSIS .exe · `npm run icon` regenerates `build/icon.png`.
+electron-builder config lives in `package.json` › `build`; ffmpeg-static is `asarUnpack`ed so the bundled binary stays executable. Builds are unsigned (set `CSC_IDENTITY_AUTO_DISCOVERY=false` or add signing creds for distribution).
 
 ## Windows (2 views)
 - **Edit** (⌘1) — Media bin (import) + Preview monitor + Timeline
@@ -53,9 +58,9 @@ Space play/pause · ←/→ step 1 frame (⇧ = 10) · S split at playhead · �
 Timeline tools: ⬚ select · ✂ razor · 🧲 snap · −/1×/+ zoom · +Text · +BG · </> code · +Track. Drag a clip up/down to move it between tracks.
 
 ## Right now
-Imported media is fully **editable + saveable + exportable**: drag-reorder/resize clips on the
-timeline, tune each clip in the Inspector (fit, scale, position, rotation, opacity, duration, video
-trim), set comp bg/fps; every transform is resolution-independent so it renders identically in the
-ffmpeg export at 720p–8K. Projects save/open with the whole timeline (media referenced by file path).
-Next: **M8 — animated backgrounds / code-layers** (keyframed web content, not just stills), then
-audio polish (mux video's own audio, Web Audio preview) + M9 packaging/autosave.
+**Feature-complete and installable.** Compose on a multi-track timeline (media, text, animated
+backgrounds, live HTML/React+gsap code layers), keyframe any transform, colour-grade, add transitions,
+mix audio (waveform/volume/fades); every layer is resolution-independent and renders identically via the
+native-ffmpeg export at 720p–8K. Projects save/open (media by path) and autosave for crash recovery.
+Build a real installer with `npm run dist:mac` (or `:win`). All milestones M0–M9 are done.
+Post-1.0 ideas: code-signing/notarization, mux a video clip's own audio, multi-window.

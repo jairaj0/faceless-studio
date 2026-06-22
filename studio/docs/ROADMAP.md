@@ -29,11 +29,12 @@ Native ffmpeg render @ 1080p/4K/8K, aspect presets, progress.
 ## M7 — Media + Audio
 Image import; audio import + Web Audio (waveform, volume, fades) + export mux.
 
-## M8 — Backgrounds / Code layers
-Code layer (HTML + React + gsap), backgrounds gallery.
+## M8 — Backgrounds / Code layers ✅
+Code layer (HTML + React + gsap, sandboxed iframe, frame-accurate export), 10-preset backgrounds gallery.
 
-## M9 — Polish + Package
-Context menus everywhere, onboarding, branding, electron-builder (.dmg/.exe).
+## M9 — Polish + Package ✅
+Onboarding empty-state, Insert/View menus, app icon + branding, autosave + crash recovery,
+electron-builder real installers (.dmg built / .exe via `npm run dist:win`).
 
 > Reference implementation of all of the above already exists in `research/video-editor/app/` — we port,
 > not rewrite.
