@@ -38,19 +38,43 @@ export interface Transform {
   opacity?: Prop; // 0..1
 }
 
-export type ClipType = "media";
+export type ClipType = "media" | "text";
+
+// A text/caption layer's look. Sizes are fractions of comp height so text
+// renders identically at any export resolution.
+export interface TextSpec {
+  content: string;
+  fontSize: number; // fraction of comp height (0.1 = 10% of height)
+  color: string;
+  fontFamily: string;
+  fontWeight: number; // 400 / 700
+  align: "left" | "center" | "right";
+  bg: string; // background box colour; "" = none
+}
+
+export const DEFAULT_TEXT: TextSpec = {
+  content: "Text",
+  fontSize: 0.1,
+  color: "#ffffff",
+  fontFamily: "Inter, system-ui, sans-serif",
+  fontWeight: 700,
+  align: "center",
+  bg: "",
+};
 
 // One clip living inside a track. Times are in milliseconds. Clips are
-// free-positioned on the timeline now (explicit `start`, gaps allowed).
+// free-positioned on the timeline now (explicit `start`, gaps allowed). A clip
+// is either backed by `media` (mediaId) or is a `text` layer (text spec).
 export interface Clip {
   id: string;
   type: ClipType;
-  mediaId: string;
+  mediaId: string; // "" for text clips
   start: number; // absolute timeline ms
   duration: number;
   trimStart: number; // ms into the source media where playback begins (video)
   fit: FitMode;
   transform: Transform;
+  text?: TextSpec; // present when type === "text"
 }
 
 // A horizontal lane. Tracks composite bottom (index 0) → top (last).
@@ -158,6 +182,8 @@ interface EditorState {
 
   // clips
   addClip: (mediaId: string, trackId?: string) => void;
+  addTextClip: (trackId?: string) => void;
+  updateText: (id: string, partial: Partial<TextSpec>) => void;
   removeClip: (id: string) => void;
   duplicateClip: (id: string) => void;
   splitClip: (id: string, atMs: number) => void;
@@ -289,6 +315,37 @@ export const useEditor = create<EditorState>((set, get) => {
         );
         return { ...push(s), tracks, selectedClipId: clip.id };
       }),
+
+    // A text layer drops in at the playhead on the target track (default top
+    // track, so captions sit above footage).
+    addTextClip: (trackId) =>
+      set((s) => {
+        const tIdx = trackId
+          ? s.tracks.findIndex((t) => t.id === trackId)
+          : s.tracks.length - 1;
+        const ti = tIdx >= 0 ? tIdx : 0;
+        const clip: Clip = {
+          id: uid(),
+          type: "text",
+          mediaId: "",
+          start: Math.max(0, Math.round(s.playhead)),
+          duration: DEFAULT_CLIP_MS,
+          trimStart: 0,
+          fit: "contain",
+          transform: { ...DEFAULT_TRANSFORM },
+          text: { ...DEFAULT_TEXT },
+        };
+        const tracks = s.tracks.map((t, i) =>
+          i === ti ? { ...t, clips: [...t.clips, clip].sort((a, b) => a.start - b.start) } : t,
+        );
+        return { ...push(s), tracks, selectedClipId: clip.id };
+      }),
+
+    updateText: (id, partial) =>
+      set((s) => ({
+        ...push(s),
+        tracks: mapClip(id, (c) => ({ ...c, text: { ...DEFAULT_TEXT, ...c.text, ...partial } })),
+      })),
 
     removeClip: (id) =>
       set((s) => ({

@@ -39,6 +39,9 @@ export function EditWindow() {
           e.preventDefault();
           st.splitClip(c.id, st.playhead);
         }
+      } else if (e.code === "KeyT" && !mod) {
+        e.preventDefault();
+        st.addTextClip();
       } else if (e.code === "Home") {
         e.preventDefault();
         st.setPlayhead(0);

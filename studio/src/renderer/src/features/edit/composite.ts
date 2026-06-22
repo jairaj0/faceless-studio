@@ -189,6 +189,50 @@ function drawSource(
   ctx.restore();
 }
 
+// Draw a text/caption layer with the clip's resolved transform. Font size is a
+// fraction of comp height, so captions look identical at any export resolution.
+function drawText(ctx: CanvasRenderingContext2D, comp: Composition, clip: Clip, localT: number): void {
+  const spec = clip.text;
+  if (!spec || !spec.content) return;
+  const { width: W, height: H } = comp;
+  const tf = clip.transform;
+  const x = evalProp(tf.x, localT, TF_DEFAULT.x);
+  const y = evalProp(tf.y, localT, TF_DEFAULT.y);
+  const scale = evalProp(tf.scale, localT, TF_DEFAULT.scale);
+  const rotation = evalProp(tf.rotation, localT, TF_DEFAULT.rotation);
+  const opacity = evalProp(tf.opacity, localT, TF_DEFAULT.opacity);
+
+  const fontPx = H * spec.fontSize;
+  const lines = spec.content.split("\n");
+  const lineH = fontPx * 1.25;
+  const totalH = lines.length * lineH;
+
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, opacity));
+  ctx.translate(W / 2 + x * W, H / 2 + y * H);
+  ctx.rotate((rotation * Math.PI) / 180);
+  ctx.scale(scale, scale);
+  ctx.font = `${spec.fontWeight} ${fontPx}px ${spec.fontFamily}`;
+  ctx.textBaseline = "middle";
+
+  const maxW = lines.reduce((w, l) => Math.max(w, ctx.measureText(l).width), 0);
+
+  if (spec.bg) {
+    const padX = fontPx * 0.35;
+    const padY = fontPx * 0.2;
+    ctx.fillStyle = spec.bg;
+    ctx.fillRect(-maxW / 2 - padX, -totalH / 2 - padY, maxW + padX * 2, totalH + padY * 2);
+  }
+
+  ctx.fillStyle = spec.color;
+  ctx.textAlign = spec.align;
+  const anchorX = spec.align === "left" ? -maxW / 2 : spec.align === "right" ? maxW / 2 : 0;
+  lines.forEach((line, i) => {
+    ctx.fillText(line, anchorX, -totalH / 2 + lineH * (i + 0.5));
+  });
+  ctx.restore();
+}
+
 /** Draw one clip (resolving its source) at the given absolute time. */
 function drawClip(
   ctx: CanvasRenderingContext2D,
@@ -197,9 +241,13 @@ function drawClip(
   clip: Clip,
   t: number,
 ): void {
+  const localT = t - clip.start;
+  if (clip.type === "text") {
+    drawText(ctx, comp, clip, localT);
+    return;
+  }
   const m = media.find((x) => x.id === clip.mediaId);
   if (!m) return;
-  const localT = t - clip.start;
   if (m.kind === "video") {
     const v = getVideo(m.src);
     if (v.readyState >= 2) drawSource(ctx, comp, v, v.videoWidth, v.videoHeight, clip, localT);

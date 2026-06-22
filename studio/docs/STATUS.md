@@ -9,7 +9,7 @@ The first end-to-end vertical slice works: **import images/video → arrange on 
 ### Multi-track upgrade (5-stage plan, from OpenReel feature study)
 Premiere-style N tracks: each track has free-positioned clips (gaps allowed); higher track composites on top; per-track hide 👁 / lock 🔒 / solo ◉ / remove. Playback uses a **master clock** (playhead drives time; every visible video is seeked/nudged to stay in sync → multiple simultaneous videos / PiP).
 - **Stage 1 — multi-track core** ✅ tracks model, compositing bottom→top, vertical+horizontal clip drag, add/remove track, per-track controls, master-clock playback, v2→v3 save migration.
-- Stage 2 — Text / caption layers ❌
+- **Stage 2 — Text / caption layers** ✅ `text` clip type, canvas-rendered (res-independent fontSize, multi-line, align, colour, box), Inspector text controls (content/font/size/weight/align/colour/box), +Text button + `T` key, keyframe-animatable like any clip.
 - Stage 3 — Color / filters (per-clip + presets) ❌
 - Stage 4 — Transitions (cross-fade / wipe / slide) ❌
 - Stage 5 — Audio waveform + volume + fades (audio → track clips) ❌
@@ -49,7 +49,8 @@ Currently the menu bar has **File** only (New/Open/Import Image/Import Audio/Sav
 ## Editing shortcuts (Edit window)
 Space play/pause · ←/→ step 1 frame (⇧ = 10) · S split at playhead · ⌘D duplicate · ⌘Z / ⇧⌘Z undo/redo
 · Home/End jump to start/end · Delete/Backspace remove selected clip.
-Timeline tools: ⬚ select · ✂ razor · 🧲 snap · −/1×/+ zoom · +Track. Drag a clip up/down to move it between tracks.
+· T add text layer.
+Timeline tools: ⬚ select · ✂ razor · 🧲 snap · −/1×/+ zoom · +Text · +Track. Drag a clip up/down to move it between tracks.
 
 ## Right now
 Imported media is fully **editable + saveable + exportable**: drag-reorder/resize clips on the

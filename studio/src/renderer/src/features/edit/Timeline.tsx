@@ -50,6 +50,7 @@ export function Timeline() {
   const addTrack = useEditor((s) => s.addTrack);
   const removeTrack = useEditor((s) => s.removeTrack);
   const toggleTrack = useEditor((s) => s.toggleTrack);
+  const addTextClip = useEditor((s) => s.addTextClip);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const laneRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -244,6 +245,9 @@ export function Timeline() {
           +
         </ToolBtn>
         <Sep />
+        <ToolBtn on={false} onClick={() => addTextClip()} title="Add a text / caption layer (T)">
+          + Text
+        </ToolBtn>
         <ToolBtn on={false} onClick={addTrack} title="Add a track">
           + Track
         </ToolBtn>
@@ -363,8 +367,14 @@ export function Timeline() {
                 }}
               >
                 {track.clips.map((c) => {
+                  const isText = c.type === "text";
                   const m = media.find((x) => x.id === c.mediaId);
                   const active = c.id === selectedClipId;
+                  const clipBg = isText
+                    ? "linear-gradient(180deg,#5a4a8f,#3d3168)"
+                    : m?.kind === "image"
+                      ? `center/cover url(${m.src})`
+                      : "var(--bg-2)";
                   return (
                     <div key={c.id}>
                       <div
@@ -383,7 +393,7 @@ export function Timeline() {
                           height: TRACK_H - 8,
                           borderRadius: 5,
                           overflow: "hidden",
-                          background: m?.kind === "image" ? `center/cover url(${m.src})` : "var(--bg-2)",
+                          background: clipBg,
                           border: `2px solid ${active ? "var(--accent)" : "var(--border)"}`,
                           cursor: track.locked ? "default" : tool === "razor" ? "crosshair" : "grab",
                           boxShadow: active
@@ -406,8 +416,7 @@ export function Timeline() {
                             textOverflow: "ellipsis",
                           }}
                         >
-                          {m?.kind === "video" ? "🎞 " : ""}
-                          {m?.name ?? "missing"}
+                          {isText ? `T ${c.text?.content ?? ""}` : `${m?.kind === "video" ? "🎞 " : ""}${m?.name ?? "missing"}`}
                         </div>
                         {!track.locked && (
                           <>

@@ -9,6 +9,12 @@ import { EASING_OPTIONS, type EasingName } from "./animate";
 
 const FITS: FitMode[] = ["contain", "cover", "fill"];
 const FPS_OPTIONS = [24, 25, 30, 60];
+const FONTS = [
+  { label: "Sans", value: "Inter, system-ui, sans-serif" },
+  { label: "Serif", value: "Georgia, 'Times New Roman', serif" },
+  { label: "Mono", value: "'SF Mono', Menlo, monospace" },
+];
+const ALIGNS: ("left" | "center" | "right")[] = ["left", "center", "right"];
 
 const ROWS: { key: TransformKey; label: string; min: number; max: number; step: number; pct?: boolean; deg?: boolean }[] = [
   { key: "scale", label: "Scale", min: 0.1, max: 4, step: 0.01, pct: true },
@@ -46,11 +52,14 @@ export function Inspector() {
   const resetTransform = useEditor((s) => s.resetTransform);
   const setKeyframeEasing = useEditor((s) => s.setKeyframeEasing);
   const selectKeyframe = useEditor((s) => s.selectKeyframe);
+  const updateText = useEditor((s) => s.updateText);
   const pushHistory = useEditor((s) => s.pushHistory);
 
   const clip = findClip(tracks, selectedId);
-  const m = clip ? media.find((x) => x.id === clip.mediaId) : null;
+  const isText = clip?.type === "text";
+  const m = clip && !isText ? media.find((x) => x.id === clip.mediaId) : null;
   const isVideo = m?.kind === "video";
+  const txt = clip?.text;
 
   const kfMode = !!(selectedKeyframe && clip && selectedKeyframe.clipId === clip.id);
   let curEase: EasingName = "easeOut";
@@ -100,7 +109,7 @@ export function Inspector() {
         </Field>
       </Section>
 
-      {!clip || !m ? (
+      {!clip || (!m && !isText) ? (
         <div style={{ padding: 16, fontSize: 11, color: "var(--fg-3)" }}>
           Select a clip on the timeline to edit it.
         </div>
@@ -142,34 +151,114 @@ export function Inspector() {
             </div>
           )}
 
-          <Section title={`Clip · ${m.name}`}>
-            <Field label="Fit">
-              <div style={{ display: "flex", gap: 4 }}>
-                {FITS.map((f) => {
-                  const on = clip.fit === f;
-                  return (
-                    <button
-                      key={f}
-                      onClick={() => updateClip(clip.id, { fit: f })}
-                      style={{
-                        flex: 1,
-                        padding: "4px 6px",
-                        fontSize: 10.5,
-                        textTransform: "capitalize",
-                        color: on ? "#fff" : "var(--fg-2)",
-                        background: on ? "var(--accent)" : "var(--bg-2)",
-                        border: "1px solid var(--border)",
-                        borderRadius: 4,
-                        cursor: "pointer",
-                      }}
-                    >
-                      {f}
+          {isText && txt ? (
+            <Section title="Text">
+              <textarea
+                value={txt.content}
+                onChange={(e) => updateText(clip.id, { content: e.target.value })}
+                rows={2}
+                placeholder="Type caption…"
+                style={{
+                  width: "100%",
+                  resize: "vertical",
+                  fontSize: 12,
+                  color: "var(--fg)",
+                  background: "var(--bg-2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 5,
+                  padding: "6px 8px",
+                  fontFamily: "inherit",
+                }}
+              />
+              <Field label="Font">
+                <select
+                  value={txt.fontFamily}
+                  onChange={(e) => updateText(clip.id, { fontFamily: e.target.value })}
+                  style={selectStyle}
+                >
+                  {FONTS.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Size">
+                <input
+                  type="range"
+                  min={0.02}
+                  max={0.4}
+                  step={0.005}
+                  value={txt.fontSize}
+                  onChange={(e) => updateText(clip.id, { fontSize: Number(e.target.value) })}
+                  style={{ width: 110, accentColor: "var(--accent)" }}
+                />
+                <span style={{ fontSize: 11, color: "var(--fg-3)", width: 28, textAlign: "right" }}>
+                  {Math.round(txt.fontSize * 100)}
+                </span>
+              </Field>
+              <Field label="Weight">
+                <div style={{ display: "flex", gap: 4 }}>
+                  {[400, 700].map((w) => {
+                    const on = txt.fontWeight === w;
+                    return (
+                      <button
+                        key={w}
+                        onClick={() => updateText(clip.id, { fontWeight: w })}
+                        style={segBtn(on)}
+                      >
+                        {w === 400 ? "Regular" : "Bold"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+              <Field label="Align">
+                <div style={{ display: "flex", gap: 4 }}>
+                  {ALIGNS.map((a) => (
+                    <button key={a} onClick={() => updateText(clip.id, { align: a })} style={segBtn(txt.align === a)}>
+                      {a === "left" ? "⬅" : a === "center" ? "⬌" : "➡"}
                     </button>
-                  );
-                })}
-              </div>
-            </Field>
-          </Section>
+                  ))}
+                </div>
+              </Field>
+              <Field label="Colour">
+                <input
+                  type="color"
+                  value={txt.color}
+                  onChange={(e) => updateText(clip.id, { color: e.target.value })}
+                  style={colorStyle}
+                />
+                <span style={{ fontSize: 11, color: "var(--fg-3)" }}>{txt.color}</span>
+              </Field>
+              <Field label="Box">
+                <input
+                  type="color"
+                  value={txt.bg || "#000000"}
+                  onChange={(e) => updateText(clip.id, { bg: e.target.value })}
+                  style={colorStyle}
+                />
+                <button onClick={() => updateText(clip.id, { bg: "" })} style={{ ...miniBtnStyle, width: "auto", padding: "2px 8px" }}>
+                  {txt.bg ? "Clear" : "None"}
+                </button>
+              </Field>
+            </Section>
+          ) : m ? (
+            <Section title={`Clip · ${m.name}`}>
+              <Field label="Fit">
+                <div style={{ display: "flex", gap: 4 }}>
+                  {FITS.map((f) => {
+                    const on = clip.fit === f;
+                    return (
+                      <button key={f} onClick={() => updateClip(clip.id, { fit: f })} style={segBtn(on)}>
+                        <span style={{ textTransform: "capitalize" }}>{f}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+            </Section>
+          ) : null}
 
           <Section title="Transform (◆ = keyframe at playhead)">
             {ROWS.map((r) => {
@@ -301,5 +390,26 @@ const miniBtnStyle: React.CSSProperties = {
   borderRadius: 5,
   cursor: "pointer",
 };
+
+const colorStyle: React.CSSProperties = {
+  width: 36,
+  height: 22,
+  padding: 0,
+  border: "1px solid var(--border)",
+  borderRadius: 4,
+  background: "none",
+  cursor: "pointer",
+};
+
+const segBtn = (on: boolean): React.CSSProperties => ({
+  flex: 1,
+  padding: "4px 6px",
+  fontSize: 10.5,
+  color: on ? "#fff" : "var(--fg-2)",
+  background: on ? "var(--accent)" : "var(--bg-2)",
+  border: "1px solid var(--border)",
+  borderRadius: 4,
+  cursor: "pointer",
+});
 
 export default Inspector;

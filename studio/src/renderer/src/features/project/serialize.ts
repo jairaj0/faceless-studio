@@ -66,7 +66,7 @@ const newId = (): string =>
 
 // Build the track list from either v3 (tracks) or v2 (single gapless clips).
 function migrateTracks(d: ProjectEditor, ids: Set<string>): Track[] {
-  const keep = (c: Clip): boolean => ids.has(c.mediaId);
+  const keep = (c: Clip): boolean => c.type === "text" || ids.has(c.mediaId);
   if (d.tracks?.length) {
     return d.tracks.map((t) => ({
       id: t.id ?? newId(),

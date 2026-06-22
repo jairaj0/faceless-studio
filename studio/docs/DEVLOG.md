@@ -4,6 +4,25 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — Multi-track Stage 2 (text / caption layers)
+**Done — clips can now be text, not just media:**
+- **Model**: `ClipType = "media" | "text"`, `Clip.text?: TextSpec` (content, fontSize as fraction of
+  comp height, color, fontFamily, fontWeight, align, bg box). Actions `addTextClip(trackId?)` (drops at
+  playhead on the top track) + `updateText(id, partial)`. Save migration keeps text clips (they have no
+  mediaId, so the media-id filter now also keeps `type === "text"`).
+- **Render** (`composite.ts` `drawText`): canvas-drawn, resolution-independent — multi-line, left/center/
+  right align, optional background box, with the clip's full keyframed transform (so text fades/slides/
+  scales/rotates exactly like media). Same draw path → preview == export.
+- **Inspector**: Text section (content textarea, font family, size, weight, align, colour, box) shown for
+  text clips; Fit shown for media clips. Transform + motion presets + timing apply to both.
+- **Timeline**: text clips render with a purple gradient + "T …content" label; **+Text** toolbar button
+  and **T** shortcut. typecheck + build green; HMR clean.
+
+**Next:** Stage 3 — color / filters (per-clip brightness/contrast/saturation/blur + presets), then Stage 4
+transitions, Stage 5 audio waveform+volume+fades.
+
+---
+
 ## 2026-06-22 — Multi-track Stage 1 (Premiere-style N tracks)
 **Done — rebuilt the document model from single-track → N free-positioned tracks** (after studying
 OpenReel's `Track[]` model; kept studio's canvas-render engine untouched per constraint "engine nhi badalna"):
