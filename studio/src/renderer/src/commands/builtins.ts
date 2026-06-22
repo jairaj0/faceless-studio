@@ -1,5 +1,6 @@
 import { registerFileCommands } from "./file.commands";
 import { registerWindowCommands } from "./window.commands";
+import { registerMediaCommands } from "./media.commands";
 
 /**
  * Registers all commands available so far. Each milestone adds its own
@@ -10,4 +11,5 @@ import { registerWindowCommands } from "./window.commands";
 export function registerBuiltins(): void {
   registerFileCommands();
   registerWindowCommands();
+  registerMediaCommands();
 }

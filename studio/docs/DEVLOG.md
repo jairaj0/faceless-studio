@@ -4,6 +4,28 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — Day 1 (later 3): MVP loop — import → timeline → preview → export
+**Done**
+- **Edit window** is now a real workspace: Media Bin + Preview Monitor + Timeline.
+  - Media Bin: Import Image (multi) / Import Audio → list with thumbs; double-click/＋ adds to timeline.
+  - Preview Monitor: canvas composite at comp size, play/pause + playhead time, redraws on decode.
+  - Timeline: gapless image clips, click-to-scrub, drag right edge to resize duration, per-clip remove, playhead.
+- **Export window** wired to the same store: resolution presets 720p/1080p/4K/8K, renders each frame on a
+  canvas → ships PNG to main → **native ffmpeg** (libx264, crf18) → mp4, optional audio muxed (`-shortest`).
+  Progress bar (capture % then encode %), reveals file in Finder on done.
+- Backend: `ipc/media.ts` (dialog import), `ipc/export.ts` + `services/exportSession.ts` (begin/frame/encode/cancel),
+  `services/ffmpeg.ts`. ffmpeg detected at boot (`ffmpeg 6.0`).
+- Windows trimmed 3→2 (Edit ⌘1 / Export ⌘2) — Import&Preview folded into Edit. File menu gained Import Image/Audio.
+- Covers: **M3 (timeline, basic) ✅, M6 (export) ✅**; partial **M2 (monitor), M7 (media+audio import)**.
+
+**Next**
+- M2: port the scene engine (animated web layers, not just stills) + Inspector (M4) + serialize timeline into the project doc (M5).
+
+**Blocked**
+- None. (Note: leave only one `npm run dev` running — stale instances hog ports 5173/5174.)
+
+---
+
 ## 2026-06-22 — Day 1 (later 2): menu trimmed + Windows + File working
 **Done**
 - Policy: only working buttons shown. Menu bar trimmed to **File + Window** (rest return per milestone).

@@ -5,8 +5,7 @@ import { useApp, type AppView } from "../../store";
 
 const WINDOWS: { id: AppView; label: string; shortcut: string }[] = [
   { id: "edit", label: "Edit", shortcut: "⌘1" },
-  { id: "import", label: "Import & Preview", shortcut: "⌘2" },
-  { id: "export", label: "Export", shortcut: "⌘3" },
+  { id: "export", label: "Export", shortcut: "⌘2" },
 ];
 
 export function MenuBar() {

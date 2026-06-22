@@ -1,6 +1,7 @@
 import { create } from "zustand";
+import { useEditor } from "./editor";
 
-export type AppView = "edit" | "import" | "export";
+export type AppView = "edit" | "export";
 
 /** Placeholder document — future milestones fill `scene`. */
 export interface ProjectDoc {
@@ -29,8 +30,10 @@ export const useApp = create<AppState>((set) => ({
   doc: emptyDoc(),
 
   setView: (v) => set({ view: v }),
-  newProject: () =>
-    set({ projectName: "Untitled", currentPath: null, doc: emptyDoc(), view: "edit" }),
+  newProject: () => {
+    useEditor.getState().reset();
+    set({ projectName: "Untitled", currentPath: null, doc: emptyDoc(), view: "edit" });
+  },
   loadProject: (p) =>
     set({
       projectName: p.name ?? "Untitled",

@@ -1,6 +1,9 @@
 import { app, BrowserWindow } from "electron";
 import { join } from "path";
 import { registerProjectIpc } from "./ipc/project";
+import { registerMediaIpc } from "./ipc/media";
+import { registerExportIpc } from "./ipc/export";
+import { ffmpegVersion } from "./services/ffmpeg";
 
 // Backend (Electron main). IPC handlers are registered per-domain under ipc/.
 
@@ -26,8 +29,11 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   registerProjectIpc();
+  registerMediaIpc();
+  registerExportIpc();
+  console.log("[main] ffmpeg ->", await ffmpegVersion());
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

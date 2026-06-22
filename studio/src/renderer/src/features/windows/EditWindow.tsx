@@ -1,15 +1,17 @@
-import { WindowPlaceholder } from "./WindowPlaceholder";
+import { MediaBin } from "../edit/MediaBin";
+import { PreviewMonitor } from "../edit/PreviewMonitor";
+import { Timeline } from "../edit/Timeline";
 
+// The editing workspace: media bin + preview on top, timeline below.
 export function EditWindow() {
   return (
-    <WindowPlaceholder
-      icon="✂️"
-      title="Edit"
-      lines={[
-        "The editing workspace — monitor, timeline, inspector, tools.",
-        "Built next: M2 (engine + monitor) → M3 (timeline) → M4 (inspector).",
-      ]}
-    />
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+        <MediaBin />
+        <PreviewMonitor />
+      </div>
+      <Timeline />
+    </div>
   );
 }
 
