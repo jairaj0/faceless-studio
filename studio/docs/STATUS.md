@@ -2,7 +2,7 @@
 
 Updated: 2026-06-22 · Legend: ✅ done · 🔨 in progress · ❌ not started
 
-## Current milestone: **Multi-track + all 4 OpenReel features done (Stages 1–5 ✅)**
+## Current milestone: **M8 done — animated backgrounds + code layers ✅** (Stages 1–6)
 
 The first end-to-end vertical slice works: **import images/video → arrange on N timeline tracks → preview → export MP4 (native ffmpeg)** at 720p/1080p/4K/8K, optional audio muxed in.
 
@@ -27,7 +27,7 @@ Premiere-style N tracks: each track has free-positioned clips (gaps allowed); hi
 | M5 — Project I/O | ✅ | save/open .json serializes full editor (comp+media-by-path+clips+audio); media re-read on open · autosave → M9 |
 | M6 — Export (native ffmpeg) | ✅ | canvas frames → ffmpeg H.264 mp4, 720p–8K + audio mux |
 | M7 — Media + Audio | ✅ | image/**video**/audio import (buttons + drag&drop) ✅ · video plays in preview + renders in export ✅ · **Web Audio preview + waveform + volume + fades** ✅ · video's own audio mux = later |
-| M8 — Backgrounds + Code layers | ❌ | port |
+| M8 — Backgrounds + Code layers | ✅ | **10 procedural animated backgrounds** (pure canvas fns of clip-local time → frame-accurate, preview==export) + gallery modal + Inspector (preset grid, 3 colours, speed) · **Code layers (HTML/CSS/JS or React/JSX + gsap)** in a sandboxed iframe, live in preview overlay, exported frame-accurately via modern-screenshot rasterisation at render resolution; vendored react/react-dom/babel/gsap/modern-screenshot |
 | M9 — Polish + Package | ❌ | |
 
 ## Menu policy (IMPORTANT)
@@ -49,8 +49,8 @@ Currently the menu bar has **File** only (New/Open/Import Image/Import Audio/Sav
 ## Editing shortcuts (Edit window)
 Space play/pause · ←/→ step 1 frame (⇧ = 10) · S split at playhead · ⌘D duplicate · ⌘Z / ⇧⌘Z undo/redo
 · Home/End jump to start/end · Delete/Backspace remove selected clip.
-· T add text layer.
-Timeline tools: ⬚ select · ✂ razor · 🧲 snap · −/1×/+ zoom · +Text · +Track. Drag a clip up/down to move it between tracks.
+· T add text layer · B add background · L add code layer.
+Timeline tools: ⬚ select · ✂ razor · 🧲 snap · −/1×/+ zoom · +Text · +BG · </> code · +Track. Drag a clip up/down to move it between tracks.
 
 ## Right now
 Imported media is fully **editable + saveable + exportable**: drag-reorder/resize clips on the

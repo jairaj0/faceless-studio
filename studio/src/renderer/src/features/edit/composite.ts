@@ -1,6 +1,7 @@
 import type { Clip, Composition, FilterSpec, MediaItem, Track } from "../../store/editor";
 import { allClips, TF_DEFAULT } from "../../store/editor";
 import { evalProp } from "./animate";
+import { drawBackground } from "./backgrounds";
 
 // In/out transition state at a clip-local time: an alpha multiplier, a
 // screen-space offset (slide), and an optional reveal rect (wipe).
@@ -296,6 +297,19 @@ function drawText(ctx: CanvasRenderingContext2D, comp: Composition, clip: Clip, 
   ctx.restore();
 }
 
+/** Draw a pre-rasterised code-layer image with the clip transform + transition. */
+export function drawCodeLayer(
+  ctx: CanvasRenderingContext2D,
+  comp: Composition,
+  clip: Clip,
+  localT: number,
+  img: CanvasImageSource,
+): void {
+  const w = (img as HTMLImageElement).naturalWidth || comp.width;
+  const h = (img as HTMLImageElement).naturalHeight || comp.height;
+  drawSource(ctx, comp, img, w, h, clip, localT);
+}
+
 /** Draw one clip (resolving its source) at the given absolute time. */
 function drawClip(
   ctx: CanvasRenderingContext2D,
@@ -303,10 +317,22 @@ function drawClip(
   media: MediaItem[],
   clip: Clip,
   t: number,
+  codeImages?: Map<string, HTMLImageElement>,
 ): void {
   const localT = t - clip.start;
   if (clip.type === "text") {
     drawText(ctx, comp, clip, localT);
+    return;
+  }
+  if (clip.type === "background") {
+    drawBackground(ctx, comp, clip, localT);
+    return;
+  }
+  // Code layers render live via the preview overlay; on export they are
+  // rasterised ahead of time and drawn here in correct z-order.
+  if (clip.type === "code") {
+    const img = codeImages?.get(clip.id);
+    if (img) drawCodeLayer(ctx, comp, clip, localT, img);
     return;
   }
   const m = media.find((x) => x.id === clip.mediaId);
@@ -328,9 +354,10 @@ export function drawFrame(
   media: MediaItem[],
   tracks: Track[],
   t: number,
+  codeImages?: Map<string, HTMLImageElement>,
 ): void {
   const { width: W, height: H } = comp;
   ctx.fillStyle = comp.bg;
   ctx.fillRect(0, 0, W, H);
-  for (const clip of visibleClipsAt(tracks, t)) drawClip(ctx, comp, media, clip, t);
+  for (const clip of visibleClipsAt(tracks, t)) drawClip(ctx, comp, media, clip, t, codeImages);
 }

@@ -5,6 +5,7 @@ import {
   DEFAULT_FILTERS,
   FILTER_PRESETS,
   DEFAULT_TRANSITION,
+  BG_PRESETS,
   type FitMode,
   type FilterSpec,
   type TransformKey,
@@ -79,6 +80,8 @@ export function Inspector() {
   const setKeyframeEasing = useEditor((s) => s.setKeyframeEasing);
   const selectKeyframe = useEditor((s) => s.selectKeyframe);
   const updateText = useEditor((s) => s.updateText);
+  const updateBg = useEditor((s) => s.updateBg);
+  const updateCode = useEditor((s) => s.updateCode);
   const updateFilters = useEditor((s) => s.updateFilters);
   const applyFilterPreset = useEditor((s) => s.applyFilterPreset);
   const setTransition = useEditor((s) => s.setTransition);
@@ -86,9 +89,14 @@ export function Inspector() {
 
   const clip = findClip(tracks, selectedId);
   const isText = clip?.type === "text";
-  const m = clip && !isText ? media.find((x) => x.id === clip.mediaId) : null;
+  const isBg = clip?.type === "background";
+  const isCode = clip?.type === "code";
+  const isLayer = isText || isBg || isCode; // self-contained (no media)
+  const m = clip && !isLayer ? media.find((x) => x.id === clip.mediaId) : null;
   const isVideo = m?.kind === "video";
   const txt = clip?.text;
+  const bg = clip?.bg;
+  const code = clip?.code;
 
   const kfMode = !!(selectedKeyframe && clip && selectedKeyframe.clipId === clip.id);
   let curEase: EasingName = "easeOut";
@@ -179,7 +187,7 @@ export function Inspector() {
         </Section>
       )}
 
-      {!clip || (!m && !isText) ? (
+      {!clip || (!m && !isLayer) ? (
         <div style={{ padding: 16, fontSize: 11, color: "var(--fg-3)" }}>
           Select a clip on the timeline to edit it.
         </div>
@@ -312,6 +320,98 @@ export function Inspector() {
                   {txt.bg ? "Clear" : "None"}
                 </button>
               </Field>
+            </Section>
+          ) : isBg && bg ? (
+            <Section title="Background">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                {BG_PRESETS.map((p) => {
+                  const on = bg.preset === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      title={p.label}
+                      onClick={() => {
+                        pushHistory();
+                        updateBg(clip.id, { preset: p.id, colorA: p.colors[0], colorB: p.colors[1], colorC: p.colors[2] });
+                      }}
+                      style={{
+                        height: 40,
+                        borderRadius: 6,
+                        border: on ? "2px solid var(--accent)" : "1px solid var(--border)",
+                        background: p.swatch,
+                        cursor: "pointer",
+                        color: "#fff",
+                        fontSize: 10,
+                        fontWeight: 600,
+                        textShadow: "0 1px 2px rgba(0,0,0,.8)",
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <Field label="Colour A">
+                <input type="color" value={bg.colorA} onPointerDown={pushHistory} onChange={(e) => updateBg(clip.id, { colorA: e.target.value })} style={colorStyle} />
+              </Field>
+              <Field label="Colour B">
+                <input type="color" value={bg.colorB} onPointerDown={pushHistory} onChange={(e) => updateBg(clip.id, { colorB: e.target.value })} style={colorStyle} />
+              </Field>
+              <Field label="Colour C">
+                <input type="color" value={bg.colorC} onPointerDown={pushHistory} onChange={(e) => updateBg(clip.id, { colorC: e.target.value })} style={colorStyle} />
+              </Field>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 11, color: "var(--fg-2)", flex: 1 }}>Speed</span>
+                  <span style={{ fontSize: 11, color: "var(--fg-3)" }}>{bg.speed.toFixed(1)}×</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={3}
+                  step={0.1}
+                  value={bg.speed}
+                  onPointerDown={pushHistory}
+                  onChange={(e) => updateBg(clip.id, { speed: Number(e.target.value) })}
+                  style={{ width: "100%", accentColor: "var(--accent)" }}
+                />
+              </div>
+            </Section>
+          ) : isCode && code ? (
+            <Section title={`Code (${code.lang})`}>
+              <Field label="Language">
+                <div style={{ display: "flex", gap: 4 }}>
+                  {(["html", "react"] as const).map((l) => (
+                    <button key={l} onClick={() => updateCode(clip.id, { lang: l })} style={segBtn(code.lang === l)}>
+                      {l === "html" ? "HTML/CSS/JS" : "React/JSX"}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <textarea
+                value={code.source}
+                onFocus={pushHistory}
+                onChange={(e) => updateCode(clip.id, { source: e.target.value })}
+                spellCheck={false}
+                rows={12}
+                style={{
+                  width: "100%",
+                  resize: "vertical",
+                  fontSize: 11,
+                  lineHeight: 1.4,
+                  color: "var(--fg)",
+                  background: "var(--bg-2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 5,
+                  padding: "6px 8px",
+                  fontFamily: "'SF Mono', Menlo, monospace",
+                  whiteSpace: "pre",
+                  overflowWrap: "normal",
+                }}
+              />
+              <span style={{ fontSize: 10, color: "var(--fg-3)" }}>
+                gsap is available. Tip: CSS/gsap animations export frame-accurately.
+              </span>
             </Section>
           ) : m ? (
             <Section title={`Clip · ${m.name}`}>

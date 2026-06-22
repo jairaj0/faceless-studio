@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditor } from "../../store/editor";
 import { drawFrame, getImage, getVideo, localTime, pauseVideos, visibleClipsAt } from "./composite";
 import { syncAudio, stopAudio } from "./audioPreview";
+import { CodeOverlay } from "./CodeOverlay";
 
 export function fmtTime(ms: number): string {
   const s = Math.max(0, ms) / 1000;
@@ -11,7 +12,8 @@ export function fmtTime(ms: number): string {
 }
 
 export function PreviewMonitor() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
   const media = useEditor((s) => s.media);
   const tracks = useEditor((s) => s.tracks);
   const comp = useEditor((s) => s.comp);
@@ -132,6 +134,7 @@ export function PreviewMonitor() {
           justifyContent: "center",
           padding: 16,
           background: "#0d0d0d",
+          position: "relative",
         }}
       >
         {!hasClips ? (
@@ -139,18 +142,24 @@ export function PreviewMonitor() {
             Add media to the timeline to see a preview.
           </p>
         ) : (
-          <canvas
-            ref={canvasRef}
-            width={comp.width}
-            height={comp.height}
-            style={{
-              maxWidth: "100%",
-              maxHeight: "100%",
-              objectFit: "contain",
-              boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
-              borderRadius: 2,
-            }}
-          />
+          <>
+            <canvas
+              ref={(el) => {
+                canvasRef.current = el;
+                setCanvasEl(el);
+              }}
+              width={comp.width}
+              height={comp.height}
+              style={{
+                maxWidth: "100%",
+                maxHeight: "100%",
+                objectFit: "contain",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
+                borderRadius: 2,
+              }}
+            />
+            <CodeOverlay canvas={canvasEl} />
+          </>
         )}
       </div>
 

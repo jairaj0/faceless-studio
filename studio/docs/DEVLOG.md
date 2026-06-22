@@ -4,6 +4,35 @@ Newest first. One entry per working session. Format: Done / Next / Blocked.
 
 ---
 
+## 2026-06-22 — M8: animated backgrounds + code layers — COMPLETE
+**Done — engine extended (user lifted the "don't change engine" rule: best result wins):**
+- **Two new clip types** `background` and `code` (`ClipType` widened; clips carry optional `bg`/`code` specs).
+- **Backgrounds** (`backgrounds.ts`): `drawBackground(ctx, comp, clip, localT)` — 10 presets (aurora, mesh,
+  linear, radial, beams, grid, dots, particles, starfield, waves) as **pure procedural canvas functions of
+  clip-local time** (deterministic `rnd(seed)`, no RAF) → preview and ffmpeg export are byte-identical. Each
+  preset has 3 editable colours + a speed multiplier. `addBackgroundClip(presetId?)` drops on the **bottom**
+  track at the playhead. Inspector "Background" section = preset grid + 3 colour pickers + speed slider
+  (`updateBg`, live). Gallery modal + `+ BG` toolbar button + `B` shortcut.
+- **Code layers** (`codeLayer.ts` / `CodeOverlay.tsx` / `codeExport.ts`): author **HTML/CSS/JS or React/JSX**
+  with **gsap** available, run inside a **sandboxed iframe** (`allow-scripts allow-same-origin`) loading
+  vendored react/react-dom/babel/gsap. Live in the preview as an overlay aligned to the canvas's object-fit
+  content rect (clock seeks while paused, plays while playing). **Frame-accurate export**: an offscreen
+  iframe per code clip at render resolution, seeked via `document.getAnimations()` currentTime + gsap
+  `globalTimeline.time()`, rasterised with **modern-screenshot** `domToPng` → `<img>` → composited into the
+  export canvas in z-order (`codeImages` map threaded through `drawFrame`/`drawClip`). `addCodeClip()` drops
+  on the **top** track. Inspector "Code" section = lang toggle + source textarea. `</>` toolbar button + `L`
+  shortcut.
+- **Persistence**: bg/code clips are self-contained — migration `keep` predicate updated so they survive
+  save/open even though they have no `mediaId`.
+- **Vendored** (served from `renderer/public/vendor/`, copied into build `out/renderer/vendor/`):
+  react, react-dom, babel, gsap, modern-screenshot.
+- typecheck ✅ · build ✅ (vendor present in out).
+- **Next:** M9 — polish (context menus, onboarding, branding, autosave) + real electron-builder .dmg/.exe.
+- **Known limit:** code layers driven by `requestAnimationFrame`/`performance.now()` won't be perfectly
+  frame-seekable (only CSS animations + gsap timelines are); WebGL needs `preserveDrawingBuffer`.
+
+---
+
 ## 2026-06-22 — Multi-track Stage 5 (audio waveform + volume + fades) — plan COMPLETE
 **Done — final OpenReel feature; engine untouched:**
 - **Model**: `AudioMix { volume, fadeIn, fadeOut }` (fades in ms) + `audioMix` state, `setAudioMix` (live;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useEditor, allClips, type Clip, type Track, type TransformKey } from "../../store/editor";
+import { useEditor, allClips, BG_PRESETS, type Clip, type Track, type TransformKey } from "../../store/editor";
 import { fmtTime } from "./PreviewMonitor";
 import { getPeaks } from "./audioPreview";
 
@@ -53,6 +53,8 @@ export function Timeline() {
   const removeTrack = useEditor((s) => s.removeTrack);
   const toggleTrack = useEditor((s) => s.toggleTrack);
   const addTextClip = useEditor((s) => s.addTextClip);
+  const addBackgroundClip = useEditor((s) => s.addBackgroundClip);
+  const addCodeClip = useEditor((s) => s.addCodeClip);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const laneRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -60,6 +62,7 @@ export function Timeline() {
   const [zoom, setZoom] = useState(1);
   const [snap, setSnap] = useState(true);
   const [ctx, setCtx] = useState<{ x: number; y: number; clipId: string } | null>(null);
+  const [bgGallery, setBgGallery] = useState(false);
 
   const pxMs = BASE_PXMS * zoom;
   const contentW = Math.max(900, (total + 4000) * pxMs);
@@ -250,6 +253,12 @@ export function Timeline() {
         <ToolBtn on={false} onClick={() => addTextClip()} title="Add a text / caption layer (T)">
           + Text
         </ToolBtn>
+        <ToolBtn on={bgGallery} onClick={() => setBgGallery(true)} title="Add an animated background">
+          + BG
+        </ToolBtn>
+        <ToolBtn on={false} onClick={() => addCodeClip()} title="Add a code layer (HTML / React + gsap)">
+          {"</>"}
+        </ToolBtn>
         <ToolBtn on={false} onClick={addTrack} title="Add a track">
           + Track
         </ToolBtn>
@@ -370,13 +379,27 @@ export function Timeline() {
               >
                 {track.clips.map((c) => {
                   const isText = c.type === "text";
+                  const isBg = c.type === "background";
+                  const isCode = c.type === "code";
                   const m = media.find((x) => x.id === c.mediaId);
                   const active = c.id === selectedClipId;
+                  const bgPreset = isBg ? BG_PRESETS.find((p) => p.id === c.bg?.preset) : undefined;
                   const clipBg = isText
                     ? "linear-gradient(180deg,#5a4a8f,#3d3168)"
-                    : m?.kind === "image"
-                      ? `center/cover url(${m.src})`
-                      : "var(--bg-2)";
+                    : isBg
+                      ? bgPreset?.swatch ?? "linear-gradient(180deg,#3a6,#163)"
+                      : isCode
+                        ? "linear-gradient(180deg,#234,#0d1b2a)"
+                        : m?.kind === "image"
+                          ? `center/cover url(${m.src})`
+                          : "var(--bg-2)";
+                  const label = isText
+                    ? `T ${c.text?.content ?? ""}`
+                    : isBg
+                      ? `▦ ${bgPreset?.label ?? c.bg?.preset ?? "Background"}`
+                      : isCode
+                        ? `</> ${c.code?.lang === "react" ? "React" : "HTML"} layer`
+                        : `${m?.kind === "video" ? "🎞 " : ""}${m?.name ?? "missing"}`;
                   return (
                     <div key={c.id}>
                       <div
@@ -418,7 +441,7 @@ export function Timeline() {
                             textOverflow: "ellipsis",
                           }}
                         >
-                          {isText ? `T ${c.text?.content ?? ""}` : `${m?.kind === "video" ? "🎞 " : ""}${m?.name ?? "missing"}`}
+                          {label}
                         </div>
                         {c.transIn && (
                           <div
@@ -579,6 +602,71 @@ export function Timeline() {
           </div>
         </div>
       </div>
+
+      {bgGallery && (
+        <>
+          <div
+            onClick={() => setBgGallery(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.55)" }}
+          />
+          <div
+            style={{
+              position: "fixed",
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%,-50%)",
+              zIndex: 51,
+              width: 520,
+              maxWidth: "90vw",
+              background: "var(--bg-1)",
+              border: "1px solid var(--border)",
+              borderRadius: 10,
+              padding: 18,
+              boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>Animated backgrounds</span>
+              <button
+                onClick={() => setBgGallery(false)}
+                style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--fg-3)", fontSize: 16, cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
+              {BG_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    addBackgroundClip(p.id);
+                    setBgGallery(false);
+                  }}
+                  style={{
+                    height: 80,
+                    borderRadius: 8,
+                    border: "1px solid var(--border)",
+                    background: p.swatch,
+                    cursor: "pointer",
+                    color: "#fff",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    textShadow: "0 1px 3px rgba(0,0,0,0.85)",
+                    display: "flex",
+                    alignItems: "flex-end",
+                    padding: 10,
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 12 }}>
+              Backgrounds drop on the bottom track at the playhead. Tweak colours & speed in the Inspector.
+            </div>
+          </div>
+        </>
+      )}
 
       {ctx && (
         <>

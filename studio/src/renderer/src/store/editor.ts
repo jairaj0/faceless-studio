@@ -38,7 +38,7 @@ export interface Transform {
   opacity?: Prop; // 0..1
 }
 
-export type ClipType = "media" | "text";
+export type ClipType = "media" | "text" | "background" | "code";
 
 // A text/caption layer's look. Sizes are fractions of comp height so text
 // renders identically at any export resolution.
@@ -60,6 +60,54 @@ export const DEFAULT_TEXT: TextSpec = {
   fontWeight: 700,
   align: "center",
   bg: "",
+};
+
+// An animated background layer, drawn procedurally on the canvas so it renders
+// identically (and frame-accurately) at any export resolution. `preset` picks
+// the generator; the three colours + speed parameterise it.
+export interface BgSpec {
+  preset: string; // id from BG_PRESETS
+  colorA: string;
+  colorB: string;
+  colorC: string;
+  speed: number; // animation-speed multiplier (1 = base)
+}
+export const DEFAULT_BG: BgSpec = {
+  preset: "aurora",
+  colorA: "#6d5efc",
+  colorB: "#19c3a6",
+  colorC: "#05060a",
+  speed: 1,
+};
+
+// id + label + default colours + a CSS swatch for the gallery thumbnail.
+export const BG_PRESETS: { id: string; label: string; colors: [string, string, string]; swatch: string }[] = [
+  { id: "aurora", label: "Aurora", colors: ["#6d5efc", "#19c3a6", "#05060a"], swatch: "radial-gradient(circle at 30% 30%,#6d5efc,transparent 60%),radial-gradient(circle at 70% 70%,#19c3a6,transparent 60%),#05060a" },
+  { id: "mesh", label: "Gradient Mesh", colors: ["#312e81", "#0f766e", "#831843"], swatch: "linear-gradient(120deg,#312e81,#0f766e,#831843)" },
+  { id: "linear", label: "Linear", colors: ["#1e3a8a", "#9333ea", "#000000"], swatch: "linear-gradient(135deg,#1e3a8a,#9333ea)" },
+  { id: "radial", label: "Spotlight", colors: ["#27408b", "#05060a", "#000000"], swatch: "radial-gradient(circle at 50% 40%,#27408b,#05060a 70%)" },
+  { id: "beams", label: "Beams", colors: ["#fb7185", "#8b5cf6", "#0b1020"], swatch: "conic-gradient(from 0deg,#fb7185,#8b5cf6,#fb7185)" },
+  { id: "grid", label: "Grid", colors: ["#0ea5e9", "#0b1020", "#000000"], swatch: "linear-gradient(#0b1020,#0b1020),repeating-linear-gradient(0deg,#0ea5e9 0 1px,transparent 1px 24px)" },
+  { id: "dots", label: "Dots", colors: ["#22d3ee", "#0b1020", "#000000"], swatch: "radial-gradient(#22d3ee 1.5px,transparent 1.6px) 0 0/22px 22px,#0b1020" },
+  { id: "particles", label: "Particles", colors: ["#93c5fd", "#0b1020", "#000000"], swatch: "radial-gradient(circle at 20% 30%,#93c5fd 1px,transparent 2px),radial-gradient(circle at 70% 60%,#93c5fd 1px,transparent 2px),#0b1020" },
+  { id: "starfield", label: "Starfield", colors: ["#ffffff", "#05060a", "#000000"], swatch: "radial-gradient(1px 1px at 20% 30%,#fff,transparent),radial-gradient(1px 1px at 60% 70%,#fff,transparent),#05060a" },
+  { id: "waves", label: "Waves", colors: ["#2563eb", "#7c3aed", "#070b18"], swatch: "linear-gradient(180deg,#070b18,#1e293b),repeating-linear-gradient(90deg,#2563eb22 0 20px,transparent 20px 40px)" },
+];
+
+// A code layer (HTML or React/JSX, with gsap available). Rendered live in the
+// preview via a sandboxed iframe, and rasterised frame-accurately on export.
+export interface CodeSpec {
+  lang: "html" | "react";
+  source: string;
+}
+export const DEFAULT_CODE: CodeSpec = {
+  lang: "html",
+  source: `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  font:700 12vh/1.1 system-ui;color:#fff;
+  background:linear-gradient(135deg,#0ea5e9,#9333ea)">
+  <span style="animation:pulse 1.6s ease-in-out infinite">Hello</span>
+</div>
+<style>@keyframes pulse{0%,100%{opacity:.4;transform:scale(.96)}50%{opacity:1;transform:scale(1.04)}}</style>`,
 };
 
 // Per-clip colour grade. brightness/contrast/saturate are multipliers (1 =
@@ -117,6 +165,8 @@ export interface Clip {
   fit: FitMode;
   transform: Transform;
   text?: TextSpec; // present when type === "text"
+  bg?: BgSpec; // present when type === "background"
+  code?: CodeSpec; // present when type === "code"
   filters?: FilterSpec; // colour grade (media clips)
   transIn?: TransitionSpec; // entrance transition
   transOut?: TransitionSpec; // exit transition
@@ -229,7 +279,11 @@ interface EditorState {
   // clips
   addClip: (mediaId: string, trackId?: string) => void;
   addTextClip: (trackId?: string) => void;
+  addBackgroundClip: (presetId?: string, trackId?: string) => void;
+  addCodeClip: (spec?: Partial<CodeSpec>, trackId?: string) => void;
   updateText: (id: string, partial: Partial<TextSpec>) => void;
+  updateBg: (id: string, partial: Partial<BgSpec>) => void;
+  updateCode: (id: string, partial: Partial<CodeSpec>) => void;
   updateFilters: (id: string, partial: Partial<FilterSpec>) => void;
   applyFilterPreset: (id: string, presetId: string) => void;
   setTransition: (id: string, slot: "in" | "out", spec: TransitionSpec | null) => void;
@@ -393,10 +447,68 @@ export const useEditor = create<EditorState>((set, get) => {
         return { ...push(s), tracks, selectedClipId: clip.id };
       }),
 
+    // A background drops at the playhead on the BOTTOM track (index 0) so it
+    // sits behind footage.
+    addBackgroundClip: (presetId, trackId) =>
+      set((s) => {
+        const preset = BG_PRESETS.find((p) => p.id === presetId) ?? BG_PRESETS[0];
+        const tIdx = trackId ? s.tracks.findIndex((t) => t.id === trackId) : 0;
+        const ti = tIdx >= 0 ? tIdx : 0;
+        const clip: Clip = {
+          id: uid(),
+          type: "background",
+          mediaId: "",
+          start: Math.max(0, Math.round(s.playhead)),
+          duration: DEFAULT_CLIP_MS,
+          trimStart: 0,
+          fit: "fill",
+          transform: { ...DEFAULT_TRANSFORM },
+          bg: { ...DEFAULT_BG, preset: preset.id, colorA: preset.colors[0], colorB: preset.colors[1], colorC: preset.colors[2] },
+        };
+        const tracks = s.tracks.map((t, i) =>
+          i === ti ? { ...t, clips: [...t.clips, clip].sort((a, b) => a.start - b.start) } : t,
+        );
+        return { ...push(s), tracks, selectedClipId: clip.id };
+      }),
+
+    // A code layer drops at the playhead on the TOP track (above footage).
+    addCodeClip: (spec, trackId) =>
+      set((s) => {
+        const tIdx = trackId ? s.tracks.findIndex((t) => t.id === trackId) : s.tracks.length - 1;
+        const ti = tIdx >= 0 ? tIdx : 0;
+        const clip: Clip = {
+          id: uid(),
+          type: "code",
+          mediaId: "",
+          start: Math.max(0, Math.round(s.playhead)),
+          duration: DEFAULT_CLIP_MS,
+          trimStart: 0,
+          fit: "fill",
+          transform: { ...DEFAULT_TRANSFORM },
+          code: { ...DEFAULT_CODE, ...spec },
+        };
+        const tracks = s.tracks.map((t, i) =>
+          i === ti ? { ...t, clips: [...t.clips, clip].sort((a, b) => a.start - b.start) } : t,
+        );
+        return { ...push(s), tracks, selectedClipId: clip.id };
+      }),
+
     updateText: (id, partial) =>
       set((s) => ({
         ...push(s),
         tracks: mapClip(id, (c) => ({ ...c, text: { ...DEFAULT_TEXT, ...c.text, ...partial } })),
+      })),
+
+    // Live (colour pickers/sliders push history on pointer-down).
+    updateBg: (id, partial) =>
+      set(() => ({
+        tracks: mapClip(id, (c) => ({ ...c, bg: { ...DEFAULT_BG, ...c.bg, ...partial } })),
+      })),
+
+    updateCode: (id, partial) =>
+      set((s) => ({
+        ...push(s),
+        tracks: mapClip(id, (c) => ({ ...c, code: { ...DEFAULT_CODE, ...c.code, ...partial } })),
       })),
 
     // Live (sliders push history on pointer-down); presets below push themselves.

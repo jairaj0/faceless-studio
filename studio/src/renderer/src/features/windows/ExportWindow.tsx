@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useEditor, allClips } from "../../store/editor";
 import { drawFrame, prepareFrame, preloadClips, pauseVideos } from "../edit/composite";
+import { CodeExporter } from "../edit/codeExport";
 import { fmtTime } from "../edit/PreviewMonitor";
 import type { ExportProgress, ExportResult } from "../../../../shared/export";
 
@@ -42,8 +43,10 @@ export function ExportWindow() {
     setResult(null);
     setProg({ phase: "capture", pct: 0, frame: 0, total });
     const stop = window.api.export.onProgress(setProg);
+    const coder = new CodeExporter();
     try {
       await preloadClips(tracks, media);
+      await coder.prepare(tracks, W, H); // mount offscreen code-layer iframes
       await window.api.export.begin();
 
       const cv = document.createElement("canvas");
@@ -56,7 +59,8 @@ export function ExportWindow() {
       for (let i = 0; i < total; i++) {
         const t = (i / comp.fps) * 1000;
         await prepareFrame(media, tracks, t); // seek visible videos to this frame
-        drawFrame(ctx, frameComp, media, tracks, t);
+        const codeImages = await coder.captureFrame(tracks, t); // rasterise code layers
+        drawFrame(ctx, frameComp, media, tracks, t, codeImages);
         await window.api.export.frame(i, cv.toDataURL("image/png"));
         setProg({ phase: "capture", pct: Math.round(((i + 1) / total) * 90), frame: i + 1, total });
       }
@@ -76,6 +80,7 @@ export function ExportWindow() {
     } catch (err) {
       setResult({ error: err instanceof Error ? err.message : String(err) });
     } finally {
+      coder.dispose();
       stop();
       setBusy(false);
       setProg(null);

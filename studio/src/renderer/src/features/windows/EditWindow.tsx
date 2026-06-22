@@ -42,6 +42,12 @@ export function EditWindow() {
       } else if (e.code === "KeyT" && !mod) {
         e.preventDefault();
         st.addTextClip();
+      } else if (e.code === "KeyB" && !mod) {
+        e.preventDefault();
+        st.addBackgroundClip();
+      } else if (e.code === "KeyL" && !mod) {
+        e.preventDefault();
+        st.addCodeClip();
       } else if (e.code === "Home") {
         e.preventDefault();
         st.setPlayhead(0);
